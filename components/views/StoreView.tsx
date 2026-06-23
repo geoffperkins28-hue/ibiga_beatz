@@ -21,7 +21,7 @@ export default function StoreView({ beats }: { beats: Beat[] }) {
   });
 
   return (
-    <div className="space-y-6">
+    <div className={`space-y-6 ${playingBeat ? "pb-28" : ""}`}>
       <div>
         <h1 className="text-2xl font-bold text-white">Beat Store</h1>
         <p className="text-muted-foreground text-sm mt-1">

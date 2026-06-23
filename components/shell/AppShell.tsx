@@ -52,7 +52,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       router.refresh();
     };
     return (
-      <div className="flex flex-col h-screen bg-background text-foreground overflow-hidden">
+      <div className="flex flex-col h-dvh bg-background text-foreground overflow-hidden">
         <header className="h-14 bg-black border-b border-border/30 flex items-center px-4 md:px-6 gap-3 shrink-0">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-full bg-[#1DB954] flex items-center justify-center">
@@ -75,7 +75,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </button>
           </div>
         </header>
-        <div className="flex-1 overflow-y-auto no-scrollbar">
+        <div className="flex-1 overflow-y-auto no-scrollbar scroll-area">
           <div className="p-6 max-w-6xl mx-auto">{children}</div>
         </div>
       </div>
@@ -91,7 +91,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     }`;
 
   return (
-    <div className="flex h-screen bg-background text-foreground overflow-hidden">
+    <div className="flex h-dvh bg-background text-foreground overflow-hidden">
       {/* Sidebar */}
       <aside
         className={`fixed md:static inset-y-0 left-0 z-40 w-64 bg-black flex flex-col shrink-0 transform transition-transform duration-300 ${
@@ -163,7 +163,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto no-scrollbar">
+        <div className="flex-1 overflow-y-auto no-scrollbar scroll-area">
           <div className="p-6 max-w-6xl mx-auto">{children}</div>
         </div>
       </main>

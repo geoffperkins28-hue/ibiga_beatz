@@ -83,6 +83,20 @@
   display: none;
 }
 
+/* Smooth, momentum scrolling that always reaches top & bottom on mobile */
+html {
+  scroll-behavior: smooth;
+}
+body {
+  overscroll-behavior: none;
+}
+.scroll-area {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  /* respect the iOS/Android safe area + home indicator at the bottom */
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
 @layer base {
   * {
     @apply border-border;
