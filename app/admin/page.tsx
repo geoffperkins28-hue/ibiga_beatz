@@ -1,4 +1,5 @@
 import DashboardView from "@/components/views/DashboardView";
+import { requireUser } from "@/lib/auth";
 import {
   getBeats,
   getSongs,
@@ -9,10 +10,11 @@ import {
   getProfile,
 } from "@/lib/data";
 
-// Admin data is request-time (and gated by middleware auth).
+// Admin data is request-time (and gated by middleware + a server-side check).
 export const dynamic = "force-dynamic";
 
 export default async function AdminPage() {
+  await requireUser();
   const [beats, songs, stats, clients, requests, bookings, profile] =
     await Promise.all([
       getBeats(),
