@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Upload, Check, Loader2 } from "lucide-react";
 import type { ProducerProfile } from "@/lib/types";
-import { updateProfile, uploadImage } from "@/lib/actions";
+import { updateProfile } from "@/lib/actions";
+import { uploadFile } from "@/lib/upload-client";
 
 const inputCls =
   "mt-1.5 w-full bg-[#282828] border border-border rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[#1DB954]/40";
@@ -31,13 +32,14 @@ function ImagePicker({
   const pick = async (file: File) => {
     setErr(null);
     setUploading(true);
-    const fd = new FormData();
-    fd.append("file", file);
-    fd.append("folder", folder);
-    const res = await uploadImage(fd);
-    setUploading(false);
-    if (res.url) onChange(res.url);
-    else setErr(res.error ?? "Upload failed.");
+    try {
+      const url = await uploadFile(file, folder, { kind: "image" });
+      onChange(url);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Upload failed.");
+    } finally {
+      setUploading(false);
+    }
   };
 
   return (

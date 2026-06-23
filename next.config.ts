@@ -1,10 +1,6 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  experimental: {
-    // Allow image uploads through Server Actions (default is 1 MB).
-    serverActions: { bodySizeLimit: "10mb" },
-  },
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "images.unsplash.com" },

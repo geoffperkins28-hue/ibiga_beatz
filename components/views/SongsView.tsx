@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Play } from "lucide-react";
+import { Play, ExternalLink } from "lucide-react";
 import type { Song } from "@/lib/types";
 import { platformColors } from "@/lib/constants";
 import { getEmbed } from "@/lib/embed";
@@ -40,39 +40,48 @@ export default function SongsView({ songs }: { songs: Song[] }) {
                   {selected.artist} · {selected.year}
                 </p>
               </div>
-              <div className="flex gap-3 mt-4">
-                <a
-                  href={selected.link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-5 py-2 rounded-full text-sm font-semibold text-black hover:opacity-90 transition-opacity"
-                  style={{ backgroundColor: platformColors[selected.platform] }}
-                >
-                  Open on {platformLabel[selected.platform]}
-                </a>
+              <div className="flex items-center gap-4 mt-4">
                 <button
                   onClick={() => setSelected(null)}
                   className="px-5 py-2 rounded-full text-sm font-semibold bg-[#282828] text-white hover:bg-[#383838] transition-colors"
                 >
                   Close
                 </button>
+                {embed && selected.link !== "#" && (
+                  <a
+                    href={selected.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-muted-foreground hover:text-white transition-colors flex items-center gap-1"
+                  >
+                    Open on {platformLabel[selected.platform]}
+                    <ExternalLink size={11} />
+                  </a>
+                )}
               </div>
             </div>
           </div>
 
           {/* Inline player — plays directly in the app when a real link exists */}
           {embed ? (
-            <iframe
-              key={embed.src}
-              src={embed.src}
-              width="100%"
-              height={embed.height}
-              style={{ borderRadius: 12 }}
-              frameBorder={0}
-              loading="lazy"
-              allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-              title={selected.title}
-            />
+            <div>
+              <iframe
+                key={embed.src}
+                src={embed.src}
+                width="100%"
+                height={embed.height}
+                style={{ borderRadius: 12 }}
+                frameBorder={0}
+                loading="lazy"
+                allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                title={selected.title}
+              />
+              {embed.type === "spotify" && (
+                <p className="text-[11px] text-muted-foreground mt-2">
+                  30-sec preview · sign in to Spotify in the player for the full track.
+                </p>
+              )}
+            </div>
           ) : (
             <p className="text-xs text-muted-foreground">
               Add a real Spotify, YouTube or Apple Music link for this track to play it inline.

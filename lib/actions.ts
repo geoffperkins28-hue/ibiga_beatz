@@ -92,35 +92,38 @@ export async function updateProfile(
   return { ok: true };
 }
 
-export interface UploadResult {
-  url?: string;
+export interface SignedUploadResult {
+  path?: string;
+  token?: string;
+  publicUrl?: string;
   error?: string;
 }
 
-/** Uploads an image to the public `media` bucket and returns its public URL. */
-export async function uploadImage(formData: FormData): Promise<UploadResult> {
+/**
+ * Mints a short-lived signed upload URL so the browser can upload a file
+ * directly to Supabase Storage. Keeps the file out of the Server Action body
+ * (Vercel caps that at ~4.5 MB) while still requiring an authenticated producer.
+ */
+export async function createSignedUpload(
+  folder: string,
+  filename: string
+): Promise<SignedUploadResult> {
   if (!(await isAuthed())) return { error: "Not authorized." };
-  const file = formData.get("file");
-  const folder = (formData.get("folder") as string) || "misc";
-  if (!(file instanceof File) || file.size === 0) {
-    return { error: "No file selected." };
-  }
 
   const sb = getSupabaseServer();
   if (!sb) return { error: "Storage isn't configured yet." };
 
-  const ext = file.name.split(".").pop() || "jpg";
-  const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-  const buffer = Buffer.from(await file.arrayBuffer());
+  const safeFolder = folder.replace(/[^a-z0-9/_-]/gi, "") || "misc";
+  const ext = (filename.split(".").pop() || "bin").replace(/[^a-z0-9]/gi, "").toLowerCase();
+  const path = `${safeFolder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
-  const { error } = await sb.storage.from(MEDIA_BUCKET).upload(path, buffer, {
-    contentType: file.type || "image/jpeg",
-    upsert: true,
-  });
-  if (error) return { error: error.message };
+  const { data, error } = await sb.storage
+    .from(MEDIA_BUCKET)
+    .createSignedUploadUrl(path);
+  if (error || !data) return { error: error?.message ?? "Could not start upload." };
 
-  const { data } = sb.storage.from(MEDIA_BUCKET).getPublicUrl(path);
-  return { url: data.publicUrl };
+  const { data: pub } = sb.storage.from(MEDIA_BUCKET).getPublicUrl(path);
+  return { path: data.path, token: data.token, publicUrl: pub.publicUrl };
 }
 
 // ── Beats management ─────────────────────────────────────────────────────────

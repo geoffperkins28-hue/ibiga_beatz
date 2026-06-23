@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useRef, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -16,6 +16,10 @@ import {
   Settings,
   X,
   ExternalLink,
+  Upload,
+  Loader2,
+  Music,
+  Image as ImageIcon,
 } from "lucide-react";
 import type {
   Beat,
@@ -36,6 +40,7 @@ import {
   type BeatInput,
   type SongInput,
 } from "@/lib/actions";
+import { uploadFile } from "@/lib/upload-client";
 
 const statIcons: Record<string, React.ElementType> = {
   DollarSign,
@@ -399,6 +404,86 @@ export default function DashboardView({
   );
 }
 
+/** Pick a file from the device → uploads straight to Storage, returns its URL. */
+function FileField({
+  label,
+  kind,
+  folder,
+  value,
+  onUploaded,
+}: {
+  label: string;
+  kind: "image" | "audio";
+  folder: string;
+  value: string;
+  onUploaded: (url: string) => void;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [name, setName] = useState("");
+
+  const pick = async (file: File) => {
+    setErr(null);
+    setName(file.name);
+    setUploading(true);
+    try {
+      const url = await uploadFile(file, folder, { kind });
+      onUploaded(url);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Upload failed.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div>
+      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">{label}</p>
+      <div className="flex items-center gap-3">
+        {kind === "image" && value ? (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img src={value} alt="" className="w-14 h-14 rounded-xl object-cover border border-border shrink-0" />
+        ) : (
+          <div className="w-14 h-14 rounded-xl bg-[#282828] border border-border flex items-center justify-center shrink-0">
+            {kind === "image" ? (
+              <ImageIcon size={18} className="text-muted-foreground" />
+            ) : (
+              <Music size={18} className={value ? "text-[#1DB954]" : "text-muted-foreground"} />
+            )}
+          </div>
+        )}
+        <div className="min-w-0 flex-1">
+          <button
+            type="button"
+            onClick={() => ref.current?.click()}
+            disabled={uploading}
+            className="px-4 py-2 rounded-full border border-border text-sm text-white hover:border-white/30 transition-colors flex items-center gap-2 disabled:opacity-60"
+          >
+            {uploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+            {uploading ? "Uploading…" : value ? "Replace" : "Choose file"}
+          </button>
+          {value && !uploading && (
+            <p className="text-[11px] text-[#1DB954] mt-1 truncate">{name || (kind === "audio" ? "Audio ready" : "Image ready")}</p>
+          )}
+          {err && <p className="text-xs text-red-400 mt-1">{err}</p>}
+        </div>
+      </div>
+      {kind === "audio" && value && <audio src={value} controls className="w-full mt-2" />}
+      <input
+        ref={ref}
+        type="file"
+        accept={kind === "image" ? "image/*" : "audio/*"}
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) pick(file);
+        }}
+      />
+    </div>
+  );
+}
+
 function AddBeatModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
   const [f, setF] = useState<BeatInput>({ title: "", genre: "Afrobeats", bpm: "", mood: "", price: "", duration: "", image: "", audioUrl: "" });
   const [err, setErr] = useState<string | null>(null);
@@ -408,6 +493,10 @@ function AddBeatModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
   const save = () =>
     start(async () => {
       setErr(null);
+      if (!f.audioUrl) {
+        setErr("Upload the beat audio (MP3) before saving.");
+        return;
+      }
       const res = await createBeat(f);
       if (res.ok) onSaved();
       else setErr(res.error ?? "Failed to save.");
@@ -415,7 +504,7 @@ function AddBeatModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
 
   return (
     <Modal title="Upload Beat" onClose={onClose}>
-      <div className="space-y-3">
+      <div className="space-y-4">
         <input className={inputCls} placeholder="Title" value={f.title} onChange={(e) => up("title", e.target.value)} />
         <div className="grid grid-cols-2 gap-3">
           <input className={inputCls} placeholder="Genre" value={f.genre} onChange={(e) => up("genre", e.target.value)} />
@@ -424,8 +513,8 @@ function AddBeatModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
           <input className={inputCls} placeholder="Price (USD)" value={f.price} onChange={(e) => up("price", e.target.value)} />
         </div>
         <input className={inputCls} placeholder="Duration (e.g. 2:45)" value={f.duration} onChange={(e) => up("duration", e.target.value)} />
-        <input className={inputCls} placeholder="Cover image URL" value={f.image} onChange={(e) => up("image", e.target.value)} />
-        <input className={inputCls} placeholder="Preview audio URL (optional)" value={f.audioUrl} onChange={(e) => up("audioUrl", e.target.value)} />
+        <FileField label="Cover art" kind="image" folder="beats/covers" value={f.image} onUploaded={(url) => up("image", url)} />
+        <FileField label="Beat audio (MP3)" kind="audio" folder="beats/audio" value={f.audioUrl} onUploaded={(url) => up("audioUrl", url)} />
         {err && <p className="text-sm text-red-400">{err}</p>}
         <button onClick={save} disabled={pending} className="w-full py-3 rounded-full bg-[#1DB954] text-black font-semibold hover:bg-[#1ed760] transition-colors disabled:opacity-60">
           {pending ? "Saving…" : "Save Beat"}
