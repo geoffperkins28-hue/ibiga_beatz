@@ -53,7 +53,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     };
     return (
       <div className="flex flex-col h-dvh bg-background text-foreground overflow-hidden">
-        <header className="h-14 bg-black border-b border-border/30 flex items-center px-4 md:px-6 gap-3 shrink-0">
+        <header className="bg-black border-b border-border/30 shrink-0 safe-top">
+          <div className="h-14 flex items-center px-4 md:px-6 gap-3">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-full bg-[#1DB954] flex items-center justify-center">
               <Headphones size={15} className="text-black" />
@@ -73,6 +74,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             >
               <LogOut size={13} /> Log Out
             </button>
+          </div>
           </div>
         </header>
         <div className="flex-1 overflow-y-auto no-scrollbar scroll-area">
@@ -94,7 +96,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     <div className="flex h-dvh bg-background text-foreground overflow-hidden">
       {/* Sidebar */}
       <aside
-        className={`fixed md:static inset-y-0 left-0 z-40 w-64 bg-black flex flex-col shrink-0 transform transition-transform duration-300 ${
+        className={`fixed md:static inset-y-0 left-0 z-40 w-64 bg-black flex flex-col shrink-0 transform transition-transform duration-300 safe-top ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
         }`}
       >
@@ -134,7 +136,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       {/* Main */}
       <main className="flex-1 flex flex-col overflow-hidden">
         {/* Topbar */}
-        <header className="h-16 bg-[#121212]/80 backdrop-blur border-b border-border/30 flex items-center px-6 gap-4 shrink-0">
+        <header className="bg-[#121212]/80 backdrop-blur border-b border-border/30 shrink-0 safe-top">
+          <div className="h-16 flex items-center px-6 gap-4">
           <button
             className="md:hidden w-9 h-9 rounded-full bg-[#282828] flex items-center justify-center"
             onClick={() => setSidebarOpen(true)}
@@ -159,6 +162,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <button className="w-9 h-9 rounded-full bg-[#282828] flex items-center justify-center hover:bg-[#383838] transition-colors" aria-label="Notifications">
               <Bell size={16} className="text-muted-foreground" />
             </button>
+          </div>
           </div>
         </header>
 

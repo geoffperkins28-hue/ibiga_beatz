@@ -97,6 +97,11 @@ body {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
+/* Keep top bars below the status bar / notch in the installed PWA */
+.safe-top {
+  padding-top: env(safe-area-inset-top);
+}
+
 @layer base {
   * {
     @apply border-border;
