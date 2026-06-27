@@ -3,10 +3,17 @@ import "./globals.css";
 import AppShell from "@/components/shell/AppShell";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://ibiga-beatz.vercel.app";
+const description =
+  "Buy exclusive beats, request custom productions, and book studio sessions with Ibiga Beatz — Afrobeats, Amapiano & R&B producer.";
+
 export const metadata: Metadata = {
-  title: "Ibiga Beatz — Music Producer",
-  description:
-    "Buy exclusive beats, request custom productions, and book studio sessions with Ibiga Beatz — Afrobeats, Amapiano & R&B producer.",
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: "Ibiga Beatz — Music Producer",
+    template: "%s · Ibiga Beatz",
+  },
+  description,
   applicationName: "Ibiga Beatz",
   appleWebApp: {
     capable: true,
@@ -16,6 +23,20 @@ export const metadata: Metadata = {
   icons: {
     icon: "/icon-192.png",
     apple: "/apple-touch-icon.png",
+  },
+  openGraph: {
+    type: "website",
+    siteName: "Ibiga Beatz",
+    title: "Ibiga Beatz — Music Producer",
+    description,
+    url: siteUrl,
+    images: [{ url: "/og.png", width: 1200, height: 630, alt: "Ibiga Beatz" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Ibiga Beatz — Music Producer",
+    description,
+    images: ["/og.png"],
   },
 };
 

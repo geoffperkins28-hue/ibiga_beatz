@@ -112,7 +112,18 @@ export default function DashboardView({
   const [pending, startTransition] = useTransition();
   const [beatModal, setBeatModal] = useState<{ initial: Beat | null } | null>(null);
   const [songModal, setSongModal] = useState<{ initial: Song | null } | null>(null);
+  const [clientQuery, setClientQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
+
+  const filteredClients = clients.filter((c) => {
+    const q = clientQuery.toLowerCase();
+    return c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q);
+  });
+
+  const newRequests = requests.filter((r) => r.status === "New").length;
+  const pendingBookings = bookings.filter((b) => b.status === "Pending").length;
+  const totalAlerts = newRequests + pendingBookings;
+  const tabCount: Partial<Record<Tab, number>> = { requests: newRequests, bookings: pendingBookings };
 
   const refresh = () => router.refresh();
 
@@ -165,8 +176,13 @@ export default function DashboardView({
             <Link href="/admin/settings" className="w-9 h-9 rounded-full bg-[#282828] flex items-center justify-center hover:bg-[#383838] transition-colors" aria-label="Settings">
               <Settings size={16} className="text-muted-foreground" />
             </Link>
-            <button className="w-9 h-9 rounded-full bg-[#282828] flex items-center justify-center hover:bg-[#383838] transition-colors" aria-label="Notifications">
+            <button className="relative w-9 h-9 rounded-full bg-[#282828] flex items-center justify-center hover:bg-[#383838] transition-colors" aria-label="Notifications">
               <Bell size={16} className="text-muted-foreground" />
+              {totalAlerts > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-[#1DB954] text-black text-[10px] font-bold flex items-center justify-center">
+                  {totalAlerts}
+                </span>
+              )}
             </button>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={profile.avatarUrl} alt={profile.displayName} className="w-9 h-9 rounded-full object-cover" />
@@ -180,11 +196,16 @@ export default function DashboardView({
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`px-4 py-2 rounded-xl text-sm font-medium transition-all capitalize whitespace-nowrap ${
+                className={`px-4 py-2 rounded-xl text-sm font-medium transition-all capitalize whitespace-nowrap flex items-center gap-1.5 ${
                   activeTab === tab ? "bg-[#1DB954] text-black" : "text-muted-foreground hover:text-white"
                 }`}
               >
                 {tab}
+                {(tabCount[tab] ?? 0) > 0 && (
+                  <span className={`min-w-4 h-4 px-1 rounded-full text-[10px] font-bold flex items-center justify-center ${activeTab === tab ? "bg-black/20 text-black" : "bg-[#1DB954] text-black"}`}>
+                    {tabCount[tab]}
+                  </span>
+                )}
               </button>
             ))}
           </div>
@@ -366,7 +387,12 @@ export default function DashboardView({
         <div className="space-y-3">
           <div className="relative">
             <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <input placeholder="Search clients..." className="w-full bg-[#282828] border border-border rounded-full pl-10 pr-4 py-2.5 text-sm text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[#1DB954]/50" />
+            <input
+              value={clientQuery}
+              onChange={(e) => setClientQuery(e.target.value)}
+              placeholder="Search clients..."
+              className="w-full bg-[#282828] border border-border rounded-full pl-10 pr-4 py-2.5 text-sm text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[#1DB954]/50"
+            />
           </div>
           <div className="bg-card border border-border rounded-2xl overflow-x-auto no-scrollbar">
             <table className="w-full min-w-[560px]">
@@ -378,7 +404,7 @@ export default function DashboardView({
                 </tr>
               </thead>
               <tbody>
-                {clients.map((c) => (
+                {filteredClients.map((c) => (
                   <tr key={c.id} className="border-b border-border/50 hover:bg-[#282828] transition-colors">
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-3">

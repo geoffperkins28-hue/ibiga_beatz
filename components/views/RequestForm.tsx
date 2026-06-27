@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { Check } from "lucide-react";
 import Field from "@/components/Field";
 import VoiceCapture from "@/components/VoiceCapture";
+import Honeypot from "@/components/Honeypot";
 import { requestGenres } from "@/lib/constants";
 import { submitCustomRequest } from "@/lib/actions";
 
@@ -23,6 +24,8 @@ const empty = {
 
 export default function RequestForm() {
   const [form, setForm] = useState(empty);
+  const [hp, setHp] = useState("");
+  const mountedAt = useRef(Date.now());
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -32,7 +35,7 @@ export default function RequestForm() {
   const handleSubmit = () => {
     setError(null);
     startTransition(async () => {
-      const res = await submitCustomRequest(form);
+      const res = await submitCustomRequest(form, { hp, elapsedMs: Date.now() - mountedAt.current });
       if (res.ok) setSubmitted(true);
       else setError(res.error ?? "Something went wrong. Please try again.");
     });
@@ -71,6 +74,7 @@ export default function RequestForm() {
       </div>
 
       <div className="bg-card border border-border rounded-3xl p-6 space-y-5">
+        <Honeypot value={hp} onChange={setHp} />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Field label="Your Name" value={form.name} onChange={(v) => update("name", v)} placeholder="Tunde Bakare" />
           <Field label="Email" value={form.email} onChange={(v) => update("email", v)} placeholder="tunde@example.com" type="email" />

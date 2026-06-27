@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getSupabaseServer } from "./supabase/server";
 import { getCurrentUser } from "./auth";
+import { notifyProducer, requestEmail, bookingEmail } from "./notify";
 import type { ProducerProfile } from "./types";
 
 const MEDIA_BUCKET = "media";
@@ -17,6 +18,21 @@ export interface ActionResult {
   error?: string;
   /** true when Supabase isn't configured yet and the submit was a no-op */
   demo?: boolean;
+}
+
+export interface AntiSpam {
+  /** honeypot field — bots fill it, humans never see it */
+  hp?: string;
+  /** ms between form mount and submit — too fast = bot */
+  elapsedMs?: number;
+}
+
+/** Returns true if a public submission looks like a bot (silently drop it). */
+function looksLikeBot(guard?: AntiSpam): boolean {
+  if (!guard) return false;
+  if (guard.hp && guard.hp.trim() !== "") return true;
+  if (typeof guard.elapsedMs === "number" && guard.elapsedMs < 3000) return true;
+  return false;
 }
 
 export interface CustomRequestInput {
@@ -34,8 +50,11 @@ export interface CustomRequestInput {
 }
 
 export async function submitCustomRequest(
-  input: CustomRequestInput
+  input: CustomRequestInput,
+  guard?: AntiSpam
 ): Promise<ActionResult> {
+  // Pretend success for bots so they don't retry, but write nothing.
+  if (looksLikeBot(guard)) return { ok: true };
   if (!input.name.trim() || !input.email.trim()) {
     return { ok: false, error: "Name and email are required." };
   }
@@ -63,6 +82,18 @@ export async function submitCustomRequest(
   });
 
   if (error) return { ok: false, error: error.message };
+  await notifyProducer(
+    `New custom request — ${input.name}`,
+    requestEmail({
+      name: input.name,
+      email: input.email,
+      genre: input.genre,
+      bpm: input.bpm,
+      budget: input.budget,
+      notes: input.notes,
+      voiceUrl: input.voiceUrl,
+    })
+  );
   return { ok: true };
 }
 
@@ -343,8 +374,10 @@ export interface BookingInput {
 }
 
 export async function submitBooking(
-  input: BookingInput
+  input: BookingInput,
+  guard?: AntiSpam
 ): Promise<ActionResult> {
+  if (looksLikeBot(guard)) return { ok: true };
   if (!input.name.trim() || !input.email.trim()) {
     return { ok: false, error: "Name and email are required." };
   }
@@ -365,5 +398,9 @@ export async function submitBooking(
   });
 
   if (error) return { ok: false, error: error.message };
+  await notifyProducer(
+    `New booking — ${input.name}`,
+    bookingEmail({ name: input.name, email: input.email, service: input.service, date: input.date })
+  );
   return { ok: true };
 }

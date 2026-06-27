@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { Calendar } from "lucide-react";
 import Field from "@/components/Field";
+import Honeypot from "@/components/Honeypot";
 import { services } from "@/lib/constants";
 import { submitBooking } from "@/lib/actions";
 
@@ -15,6 +16,8 @@ export default function BookingForm() {
     date: "",
     notes: "",
   });
+  const [hp, setHp] = useState("");
+  const mountedAt = useRef(Date.now());
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -24,7 +27,7 @@ export default function BookingForm() {
   const handleSubmit = () => {
     setError(null);
     startTransition(async () => {
-      const res = await submitBooking(form);
+      const res = await submitBooking(form, { hp, elapsedMs: Date.now() - mountedAt.current });
       if (res.ok) setSubmitted(true);
       else setError(res.error ?? "Something went wrong. Please try again.");
     });
@@ -76,6 +79,7 @@ export default function BookingForm() {
       </div>
 
       <div className="bg-card border border-border rounded-3xl p-6 space-y-4">
+        <Honeypot value={hp} onChange={setHp} />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Field label="Full Name" value={form.name} onChange={(v) => update("name", v)} placeholder="Your name" />
           <Field label="Email" value={form.email} onChange={(v) => update("email", v)} placeholder="your@email.com" type="email" />

@@ -29,6 +29,13 @@ It automatically switches to live data once Supabase is configured.
 Empty tables still fall back to mock data, so the UI never looks broken. Add a row to
 `beats`/`songs` and it appears immediately.
 
+### Email notifications (optional)
+To email the producer on each new custom request / booking, create a free
+[Resend](https://resend.com) account, verify a sender, and set `RESEND_API_KEY`,
+`RESEND_FROM`, and `PRODUCER_NOTIFY_EMAIL` (see `.env.example`). Left blank, notifications
+are skipped — the in-dashboard unread badges work regardless. Optionally set
+`NEXT_PUBLIC_SITE_URL` to your deployed URL for correct link-preview/OG image URLs.
+
 ## Routes
 
 | Route        | Page                                   |
@@ -39,7 +46,8 @@ Empty tables still fall back to mock data, so the UI never looks broken. Add a r
 | `/songs`     | Produced songs showcase                |
 | `/request`   | Custom beat request form               |
 | `/booking`   | Session booking form                   |
-| `/dashboard` | Producer dashboard (auth-gating TBD)   |
+| `/admin`     | Producer dashboard (Supabase Auth)     |
+| `/admin/login` | Producer login                       |
 
 ## Project structure
 

@@ -6,8 +6,8 @@ import type { Beat } from "@/lib/types";
 import { genres } from "@/lib/constants";
 import MiniPlayer from "@/components/MiniPlayer";
 
-export default function StoreView({ beats }: { beats: Beat[] }) {
-  const [search, setSearch] = useState("");
+export default function StoreView({ beats, initialSearch = "" }: { beats: Beat[]; initialSearch?: string }) {
+  const [search, setSearch] = useState(initialSearch);
   const [genre, setGenre] = useState("All");
   const [playingBeat, setPlayingBeat] = useState<Beat | null>(null);
   const [liked, setLiked] = useState<Set<string>>(new Set());

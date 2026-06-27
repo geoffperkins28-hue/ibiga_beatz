@@ -38,6 +38,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [query, setQuery] = useState("");
 
   // The login page renders itself full-screen — no chrome.
   if (pathname === "/admin/login") {
@@ -145,13 +146,21 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           >
             <Menu size={16} className="text-muted-foreground" />
           </button>
-          <div className="relative flex-1 max-w-sm hidden md:block">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              router.push(query.trim() ? `/store?q=${encodeURIComponent(query.trim())}` : "/store");
+            }}
+            className="relative flex-1 max-w-sm hidden md:block"
+          >
             <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
               placeholder="Search beats, artists..."
               className="w-full bg-[#282828] border border-border rounded-full pl-9 pr-4 py-2 text-sm text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[#1DB954]/40"
             />
-          </div>
+          </form>
           <div className="ml-auto flex items-center gap-3">
             <Link
               href="/store"
