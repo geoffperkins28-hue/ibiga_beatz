@@ -34,13 +34,21 @@ import { statusColors } from "@/lib/constants";
 import { getEmbed } from "@/lib/embed";
 import {
   createBeat,
+  updateBeat,
   deleteBeat,
   createSong,
+  updateSong,
   deleteSong,
+  updateRequestStatus,
+  updateBookingStatus,
+  updateBooking,
   type BeatInput,
   type SongInput,
 } from "@/lib/actions";
 import { uploadFile } from "@/lib/upload-client";
+
+const REQUEST_STATUSES = ["New", "Under Review", "Accepted", "In Progress", "Completed", "Rejected"];
+const BOOKING_STATUSES = ["Pending", "Confirmed", "Completed", "Cancelled"];
 
 const statIcons: Record<string, React.ElementType> = {
   DollarSign,
@@ -102,8 +110,8 @@ export default function DashboardView({
   const [activeTab, setActiveTab] = useState<Tab>("overview");
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [showBeatModal, setShowBeatModal] = useState(false);
-  const [showSongModal, setShowSongModal] = useState(false);
+  const [beatModal, setBeatModal] = useState<{ initial: Beat | null } | null>(null);
+  const [songModal, setSongModal] = useState<{ initial: Song | null } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = () => router.refresh();
@@ -123,6 +131,24 @@ export default function DashboardView({
       const res = await deleteSong(id);
       if (res.ok) refresh();
       else setError(res.error ?? "Failed to delete.");
+    });
+  };
+
+  const setReqStatus = (id: string, status: string) => {
+    setError(null);
+    startTransition(async () => {
+      const res = await updateRequestStatus(id, status);
+      if (res.ok) refresh();
+      else setError(res.error ?? "Failed to update.");
+    });
+  };
+
+  const setBkStatus = (id: string, status: string) => {
+    setError(null);
+    startTransition(async () => {
+      const res = await updateBookingStatus(id, status);
+      if (res.ok) refresh();
+      else setError(res.error ?? "Failed to update.");
     });
   };
 
@@ -231,7 +257,7 @@ export default function DashboardView({
           <div className="flex justify-between items-center">
             <p className="text-muted-foreground text-sm">{beats.length} beats in store</p>
             <button
-              onClick={() => setShowBeatModal(true)}
+              onClick={() => setBeatModal({ initial: null })}
               className="px-4 py-2 rounded-full bg-[#1DB954] text-black text-sm font-semibold flex items-center gap-2 hover:bg-[#1ed760] transition-colors"
             >
               <Plus size={14} /> Upload Beat
@@ -248,6 +274,13 @@ export default function DashboardView({
                 </div>
                 <span className="text-sm font-bold text-[#1DB954] shrink-0">${beat.price}</span>
                 <span className="text-xs text-muted-foreground shrink-0 hidden sm:block">{beat.plays.toLocaleString()} plays</span>
+                <button
+                  onClick={() => setBeatModal({ initial: beat })}
+                  className="w-8 h-8 rounded-full bg-[#282828] flex items-center justify-center hover:bg-[#383838] transition-colors shrink-0"
+                  aria-label="Edit beat"
+                >
+                  <Edit2 size={13} className="text-muted-foreground" />
+                </button>
                 <button
                   onClick={() => removeBeat(beat.id, beat.title)}
                   disabled={pending}
@@ -268,7 +301,7 @@ export default function DashboardView({
           <div className="flex justify-between items-center">
             <p className="text-muted-foreground text-sm">{songs.length} produced songs · paste real streaming links</p>
             <button
-              onClick={() => setShowSongModal(true)}
+              onClick={() => setSongModal({ initial: null })}
               className="px-4 py-2 rounded-full bg-[#1DB954] text-black text-sm font-semibold flex items-center gap-2 hover:bg-[#1ed760] transition-colors"
             >
               <Plus size={14} /> Add Song
@@ -289,6 +322,13 @@ export default function DashboardView({
                     {playable ? "playable" : "no link"}
                   </span>
                   <button
+                    onClick={() => setSongModal({ initial: song })}
+                    className="w-8 h-8 rounded-full bg-[#282828] flex items-center justify-center hover:bg-[#383838] transition-colors shrink-0"
+                    aria-label="Edit song"
+                  >
+                    <Edit2 size={13} className="text-muted-foreground" />
+                  </button>
+                  <button
                     onClick={() => removeSong(song.id, song.title)}
                     disabled={pending}
                     className="w-8 h-8 rounded-full bg-[#282828] flex items-center justify-center hover:bg-red-500/20 transition-colors shrink-0 disabled:opacity-50"
@@ -307,42 +347,18 @@ export default function DashboardView({
       {activeTab === "requests" && (
         <div className="space-y-3">
           {requests.map((r) => (
-            <div key={r.id} className="bg-card border border-border rounded-2xl p-5">
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <p className="font-semibold text-white">{r.name}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{r.genre} · {r.bpm} BPM · Budget: {r.budget}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{r.date}</p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <span className={`text-xs font-semibold px-3 py-1 rounded-full ${statusColors[r.status] ?? ""}`}>{r.status}</span>
-                  <button className="w-8 h-8 rounded-full bg-[#282828] flex items-center justify-center hover:bg-[#383838] transition-colors" aria-label="Edit">
-                    <Edit2 size={13} className="text-muted-foreground" />
-                  </button>
-                </div>
-              </div>
-            </div>
+            <RequestRow key={r.id} r={r} pending={pending} onStatus={setReqStatus} />
           ))}
+          {requests.length === 0 && <p className="text-sm text-muted-foreground py-8 text-center">No custom requests yet.</p>}
         </div>
       )}
 
       {activeTab === "bookings" && (
         <div className="space-y-3">
           {bookings.map((b) => (
-            <div key={b.id} className="bg-card border border-border rounded-2xl p-4 md:p-5 flex flex-col md:flex-row md:items-center gap-3">
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <p className="font-semibold text-white truncate">{b.name}</p>
-                  <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full shrink-0 ${statusColors[b.status] ?? ""}`}>{b.status}</span>
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">{b.service} · {b.date}{b.time ? ` at ${b.time}` : ""}</p>
-              </div>
-              <div className="flex gap-2 shrink-0">
-                <button className="flex-1 md:flex-none px-3 py-1.5 rounded-full bg-[#1DB954]/10 text-[#1DB954] text-xs font-semibold hover:bg-[#1DB954]/20 transition-colors">Accept</button>
-                <button className="flex-1 md:flex-none px-3 py-1.5 rounded-full bg-[#282828] text-muted-foreground text-xs hover:text-white transition-colors">Reschedule</button>
-              </div>
-            </div>
+            <BookingRow key={b.id} b={b} pending={pending} onStatus={setBkStatus} onRefresh={refresh} />
           ))}
+          {bookings.length === 0 && <p className="text-sm text-muted-foreground py-8 text-center">No bookings yet.</p>}
         </div>
       )}
 
@@ -382,23 +398,143 @@ export default function DashboardView({
         </div>
       )}
 
-      {showBeatModal && (
-        <AddBeatModal
-          onClose={() => setShowBeatModal(false)}
+      {beatModal && (
+        <BeatModal
+          initial={beatModal.initial}
+          onClose={() => setBeatModal(null)}
           onSaved={() => {
-            setShowBeatModal(false);
+            setBeatModal(null);
             refresh();
           }}
         />
       )}
-      {showSongModal && (
-        <AddSongModal
-          onClose={() => setShowSongModal(false)}
+      {songModal && (
+        <SongModal
+          initial={songModal.initial}
+          onClose={() => setSongModal(null)}
           onSaved={() => {
-            setShowSongModal(false);
+            setSongModal(null);
             refresh();
           }}
         />
+      )}
+    </div>
+  );
+}
+
+function RequestRow({
+  r,
+  pending,
+  onStatus,
+}: {
+  r: CustomRequest;
+  pending: boolean;
+  onStatus: (id: string, status: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="bg-card border border-border rounded-2xl p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-semibold text-white">{r.name}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{r.genre} · {r.bpm} BPM · Budget: {r.budget}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{r.date}</p>
+        </div>
+        <select
+          value={r.status}
+          disabled={pending}
+          onChange={(e) => onStatus(r.id, e.target.value)}
+          className={`text-xs font-semibold px-3 py-1.5 rounded-full border-0 outline-none cursor-pointer shrink-0 ${statusColors[r.status] ?? "bg-[#282828] text-white"}`}
+        >
+          {REQUEST_STATUSES.map((s) => (
+            <option key={s} value={s} className="bg-[#282828] text-white">{s}</option>
+          ))}
+        </select>
+      </div>
+      <button onClick={() => setOpen((o) => !o)} className="text-xs text-[#1DB954] mt-3 hover:underline">
+        {open ? "Hide details" : "View details"}
+      </button>
+      {open && (
+        <div className="mt-3 space-y-2 border-t border-border/50 pt-3">
+          <p className="text-xs text-muted-foreground">
+            <span className="text-white">{r.email}</span>{r.phone ? ` · ${r.phone}` : ""}
+          </p>
+          {(r.mood || r.refArtist || r.deadline) && (
+            <p className="text-xs text-muted-foreground">
+              {[r.mood && `Mood: ${r.mood}`, r.refArtist && `Ref: ${r.refArtist}`, r.deadline && `Deadline: ${r.deadline}`].filter(Boolean).join(" · ")}
+            </p>
+          )}
+          {r.notes && <p className="text-xs text-muted-foreground whitespace-pre-line">{r.notes}</p>}
+          {r.voiceUrl && (
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Voice idea</p>
+              <audio src={r.voiceUrl} controls className="w-full" />
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BookingRow({
+  b,
+  pending,
+  onStatus,
+  onRefresh,
+}: {
+  b: Booking;
+  pending: boolean;
+  onStatus: (id: string, status: string) => void;
+  onRefresh: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [date, setDate] = useState(b.date);
+  const [time, setTime] = useState(b.time);
+  const [saving, start] = useTransition();
+
+  const saveDate = () =>
+    start(async () => {
+      await updateBooking(b.id, { date, time });
+      setEditing(false);
+      onRefresh();
+    });
+
+  return (
+    <div className="bg-card border border-border rounded-2xl p-4 md:p-5 space-y-3">
+      <div className="flex flex-col md:flex-row md:items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <p className="font-semibold text-white truncate">{b.name}</p>
+            <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full shrink-0 ${statusColors[b.status] ?? ""}`}>{b.status}</span>
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">{b.service} · {b.date}{b.time ? ` at ${b.time}` : ""}</p>
+          {b.email && <p className="text-xs text-muted-foreground mt-0.5">{b.email}{b.phone ? ` · ${b.phone}` : ""}</p>}
+        </div>
+        <div className="flex gap-2 shrink-0 flex-wrap">
+          <select
+            value={b.status}
+            disabled={pending}
+            onChange={(e) => onStatus(b.id, e.target.value)}
+            className={`text-xs font-semibold px-3 py-1.5 rounded-full border-0 outline-none cursor-pointer ${statusColors[b.status] ?? "bg-[#282828] text-white"}`}
+          >
+            {BOOKING_STATUSES.map((s) => (
+              <option key={s} value={s} className="bg-[#282828] text-white">{s}</option>
+            ))}
+          </select>
+          <button onClick={() => setEditing((v) => !v)} className="px-3 py-1.5 rounded-full bg-[#282828] text-muted-foreground text-xs hover:text-white transition-colors">
+            Reschedule
+          </button>
+        </div>
+      </div>
+      {editing && (
+        <div className="flex flex-col sm:flex-row gap-2 border-t border-border/50 pt-3">
+          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputCls} />
+          <input type="time" value={time} onChange={(e) => setTime(e.target.value)} className={inputCls} />
+          <button onClick={saveDate} disabled={saving} className="px-4 py-2 rounded-full bg-[#1DB954] text-black text-sm font-semibold hover:bg-[#1ed760] transition-colors disabled:opacity-60 shrink-0">
+            {saving ? "Saving…" : "Save"}
+          </button>
+        </div>
       )}
     </div>
   );
@@ -413,7 +549,7 @@ function FileField({
   onUploaded,
 }: {
   label: string;
-  kind: "image" | "audio";
+  kind: "image" | "mp3";
   folder: string;
   value: string;
   onUploaded: (url: string) => void;
@@ -464,16 +600,16 @@ function FileField({
             {uploading ? "Uploading…" : value ? "Replace" : "Choose file"}
           </button>
           {value && !uploading && (
-            <p className="text-[11px] text-[#1DB954] mt-1 truncate">{name || (kind === "audio" ? "Audio ready" : "Image ready")}</p>
+            <p className="text-[11px] text-[#1DB954] mt-1 truncate">{name || (kind === "mp3" ? "MP3 ready" : "Image ready")}</p>
           )}
           {err && <p className="text-xs text-red-400 mt-1">{err}</p>}
         </div>
       </div>
-      {kind === "audio" && value && <audio src={value} controls className="w-full mt-2" />}
+      {kind === "mp3" && value && <audio src={value} controls className="w-full mt-2" />}
       <input
         ref={ref}
         type="file"
-        accept={kind === "image" ? "image/*" : "audio/*"}
+        accept={kind === "image" ? "image/*" : "audio/mpeg,.mp3"}
         className="hidden"
         onChange={(e) => {
           const file = e.target.files?.[0];
@@ -484,8 +620,21 @@ function FileField({
   );
 }
 
-function AddBeatModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
-  const [f, setF] = useState<BeatInput>({ title: "", genre: "Afrobeats", bpm: "", mood: "", price: "", duration: "", image: "", audioUrl: "" });
+function BeatModal({ initial, onClose, onSaved }: { initial: Beat | null; onClose: () => void; onSaved: () => void }) {
+  const [f, setF] = useState<BeatInput>(
+    initial
+      ? {
+          title: initial.title,
+          genre: initial.genre,
+          bpm: String(initial.bpm || ""),
+          mood: initial.mood ?? "",
+          price: String(initial.price ?? ""),
+          duration: initial.duration ?? "",
+          image: initial.image ?? "",
+          audioUrl: initial.audioUrl ?? "",
+        }
+      : { title: "", genre: "Afrobeats", bpm: "", mood: "", price: "", duration: "", image: "", audioUrl: "" }
+  );
   const [err, setErr] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const up = (k: keyof BeatInput, v: string) => setF((s) => ({ ...s, [k]: v }));
@@ -497,13 +646,13 @@ function AddBeatModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
         setErr("Upload the beat audio (MP3) before saving.");
         return;
       }
-      const res = await createBeat(f);
+      const res = initial ? await updateBeat(initial.id, f) : await createBeat(f);
       if (res.ok) onSaved();
       else setErr(res.error ?? "Failed to save.");
     });
 
   return (
-    <Modal title="Upload Beat" onClose={onClose}>
+    <Modal title={initial ? "Edit Beat" : "Upload Beat"} onClose={onClose}>
       <div className="space-y-4">
         <input className={inputCls} placeholder="Title" value={f.title} onChange={(e) => up("title", e.target.value)} />
         <div className="grid grid-cols-2 gap-3">
@@ -514,7 +663,7 @@ function AddBeatModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
         </div>
         <input className={inputCls} placeholder="Duration (e.g. 2:45)" value={f.duration} onChange={(e) => up("duration", e.target.value)} />
         <FileField label="Cover art" kind="image" folder="beats/covers" value={f.image} onUploaded={(url) => up("image", url)} />
-        <FileField label="Beat audio (MP3)" kind="audio" folder="beats/audio" value={f.audioUrl} onUploaded={(url) => up("audioUrl", url)} />
+        <FileField label="Beat audio (MP3)" kind="mp3" folder="beats/audio" value={f.audioUrl} onUploaded={(url) => up("audioUrl", url)} />
         {err && <p className="text-sm text-red-400">{err}</p>}
         <button onClick={save} disabled={pending} className="w-full py-3 rounded-full bg-[#1DB954] text-black font-semibold hover:bg-[#1ed760] transition-colors disabled:opacity-60">
           {pending ? "Saving…" : "Save Beat"}
@@ -524,8 +673,19 @@ function AddBeatModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
   );
 }
 
-function AddSongModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
-  const [f, setF] = useState<SongInput>({ title: "", artist: "", cover: "", platform: "spotify", link: "", year: String(new Date().getFullYear()) });
+function SongModal({ initial, onClose, onSaved }: { initial: Song | null; onClose: () => void; onSaved: () => void }) {
+  const [f, setF] = useState<SongInput>(
+    initial
+      ? {
+          title: initial.title,
+          artist: initial.artist,
+          cover: initial.cover ?? "",
+          platform: initial.platform,
+          link: initial.link === "#" ? "" : initial.link,
+          year: String(initial.year ?? new Date().getFullYear()),
+        }
+      : { title: "", artist: "", cover: "", platform: "spotify", link: "", year: String(new Date().getFullYear()) }
+  );
   const [err, setErr] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const up = (k: keyof SongInput, v: string) => setF((s) => ({ ...s, [k]: v }));
@@ -533,13 +693,13 @@ function AddSongModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
   const save = () =>
     start(async () => {
       setErr(null);
-      const res = await createSong(f);
+      const res = initial ? await updateSong(initial.id, f) : await createSong(f);
       if (res.ok) onSaved();
       else setErr(res.error ?? "Failed to save.");
     });
 
   return (
-    <Modal title="Add Produced Song" onClose={onClose}>
+    <Modal title={initial ? "Edit Song" : "Add Produced Song"} onClose={onClose}>
       <div className="space-y-3">
         <input className={inputCls} placeholder="Song title" value={f.title} onChange={(e) => up("title", e.target.value)} />
         <input className={inputCls} placeholder="Artist" value={f.artist} onChange={(e) => up("artist", e.target.value)} />

@@ -61,9 +61,16 @@ export type RequestStatus =
 export interface CustomRequest {
   id: string;
   name: string;
+  email: string;
+  phone: string;
   genre: string;
   bpm: number;
+  mood: string;
+  refArtist: string;
+  deadline: string;
   budget: string;
+  notes: string;
+  voiceUrl: string | null;
   status: RequestStatus;
   date: string;
 }
@@ -73,8 +80,11 @@ export type BookingStatus = "Pending" | "Confirmed" | "Completed" | "Cancelled";
 export interface Booking {
   id: string;
   name: string;
+  email: string;
+  phone: string;
   service: string;
   date: string;
   time: string;
+  notes: string;
   status: BookingStatus;
 }

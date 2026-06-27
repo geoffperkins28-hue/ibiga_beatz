@@ -1,18 +1,37 @@
 "use client";
 
 import { getBrowserSupabase } from "./supabase/browser";
-import { createSignedUpload } from "./actions";
+import { createSignedUpload, createVoiceUpload } from "./actions";
 
 const MEDIA_BUCKET = "media";
 
 export interface UploadOptions {
-  /** "image" enforces image types ≤5MB, "audio" enforces audio types ≤30MB */
-  kind: "image" | "audio";
+  /** "image" ≤5MB; "mp3" beat audio only ≤30MB */
+  kind: "image" | "mp3";
+}
+
+const MP3_MIME = new Set(["audio/mpeg", "audio/mp3"]);
+
+function isMp3File(file: File): boolean {
+  const ext = file.name.split(".").pop()?.toLowerCase();
+  if (ext !== "mp3") return false;
+  if (!file.type) return true;
+  return MP3_MIME.has(file.type);
 }
 
 const LIMITS = {
-  image: { bytes: 5 * 1024 * 1024, label: "5 MB", test: (t: string) => t.startsWith("image/") },
-  audio: { bytes: 30 * 1024 * 1024, label: "30 MB", test: (t: string) => t.startsWith("audio/") },
+  image: {
+    bytes: 5 * 1024 * 1024,
+    label: "5 MB",
+    test: (file: File) => file.type.startsWith("image/"),
+    typeError: "Please choose an image file.",
+  },
+  mp3: {
+    bytes: 30 * 1024 * 1024,
+    label: "30 MB",
+    test: isMp3File,
+    typeError: "Please choose an MP3 file.",
+  },
 };
 
 /**
@@ -26,8 +45,8 @@ export async function uploadFile(
   { kind }: UploadOptions
 ): Promise<string> {
   const limit = LIMITS[kind];
-  if (!limit.test(file.type)) {
-    throw new Error(`Please choose a ${kind} file.`);
+  if (!limit.test(file)) {
+    throw new Error(limit.typeError);
   }
   if (file.size > limit.bytes) {
     throw new Error(`File is too large (max ${limit.label}).`);
@@ -46,6 +65,30 @@ export async function uploadFile(
     .uploadToSignedUrl(signed.path, signed.token, file, {
       contentType: file.type,
     });
+  if (error) throw new Error(error.message);
+
+  return signed.publicUrl;
+}
+
+/**
+ * Public voice-idea upload for the (unauthenticated) custom-request form.
+ * Accepts any audio file/recording ≤15 MB; uses the no-auth signed-URL action.
+ */
+export async function uploadPublicVoice(file: File): Promise<string> {
+  if (!file.type.startsWith("audio/")) throw new Error("Please choose an audio file.");
+  if (file.size > 15 * 1024 * 1024) throw new Error("Recording is too large (max 15 MB).");
+
+  const signed = await createVoiceUpload(file.name || "voice.webm");
+  if (signed.error || !signed.path || !signed.token || !signed.publicUrl) {
+    throw new Error(signed.error ?? "Could not start the upload.");
+  }
+
+  const supabase = getBrowserSupabase();
+  if (!supabase) throw new Error("Storage isn't available.");
+
+  const { error } = await supabase.storage
+    .from(MEDIA_BUCKET)
+    .uploadToSignedUrl(signed.path, signed.token, file, { contentType: file.type });
   if (error) throw new Error(error.message);
 
   return signed.publicUrl;

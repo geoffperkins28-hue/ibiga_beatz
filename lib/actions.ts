@@ -30,6 +30,7 @@ export interface CustomRequestInput {
   deadline: string;
   budget: string;
   notes: string;
+  voiceUrl?: string;
 }
 
 export async function submitCustomRequest(
@@ -57,6 +58,7 @@ export async function submitCustomRequest(
     deadline: input.deadline || null,
     budget: input.budget || null,
     notes: input.notes || null,
+    voice_url: input.voiceUrl || null,
     status: "New",
   });
 
@@ -115,11 +117,35 @@ export async function createSignedUpload(
 
   const safeFolder = folder.replace(/[^a-z0-9/_-]/gi, "") || "misc";
   const ext = (filename.split(".").pop() || "bin").replace(/[^a-z0-9]/gi, "").toLowerCase();
+  if (safeFolder === "beats/audio" && ext !== "mp3") {
+    return { error: "Beat audio must be an MP3 file." };
+  }
   const path = `${safeFolder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
   const { data, error } = await sb.storage
     .from(MEDIA_BUCKET)
     .createSignedUploadUrl(path);
+  if (error || !data) return { error: error?.message ?? "Could not start upload." };
+
+  const { data: pub } = sb.storage.from(MEDIA_BUCKET).getPublicUrl(path);
+  return { path: data.path, token: data.token, publicUrl: pub.publicUrl };
+}
+
+/**
+ * Public (no-auth) signed upload for a visitor's voice idea on the custom-request
+ * form. Locked to the `requests/voice/` folder; the form's honeypot + audio-only
+ * client validation bound abuse.
+ */
+export async function createVoiceUpload(
+  filename: string
+): Promise<SignedUploadResult> {
+  const sb = getSupabaseServer();
+  if (!sb) return { error: "Storage isn't configured yet." };
+
+  const ext = (filename.split(".").pop() || "webm").replace(/[^a-z0-9]/gi, "").toLowerCase();
+  const path = `requests/voice/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+
+  const { data, error } = await sb.storage.from(MEDIA_BUCKET).createSignedUploadUrl(path);
   if (error || !data) return { error: error?.message ?? "Could not start upload." };
 
   const { data: pub } = sb.storage.from(MEDIA_BUCKET).getPublicUrl(path);
@@ -156,6 +182,30 @@ export async function createBeat(input: BeatInput): Promise<ActionResult> {
     audio_url: input.audioUrl || null,
     plays: 0,
   });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+export async function updateBeat(id: string, input: BeatInput): Promise<ActionResult> {
+  if (!(await isAuthed())) return { ok: false, error: "Not authorized." };
+  if (!input.title.trim()) return { ok: false, error: "Title is required." };
+  const sb = getSupabaseServer();
+  if (!sb) return { ok: true, demo: true };
+
+  const { error } = await sb
+    .from("beats")
+    .update({
+      title: input.title,
+      genre: input.genre || "Afrobeats",
+      bpm: input.bpm ? Number(input.bpm) : 0,
+      mood: input.mood || null,
+      price: input.price ? Number(input.price) : 0,
+      duration: input.duration || null,
+      image: input.image || null,
+      audio_url: input.audioUrl || null,
+    })
+    .eq("id", id);
   if (error) return { ok: false, error: error.message };
   revalidatePath("/", "layout");
   return { ok: true };
@@ -205,11 +255,79 @@ export async function createSong(input: SongInput): Promise<ActionResult> {
   return { ok: true };
 }
 
+export async function updateSong(id: string, input: SongInput): Promise<ActionResult> {
+  if (!(await isAuthed())) return { ok: false, error: "Not authorized." };
+  if (!input.title.trim() || !input.link.trim()) {
+    return { ok: false, error: "Title and streaming link are required." };
+  }
+  const sb = getSupabaseServer();
+  if (!sb) return { ok: true, demo: true };
+
+  const { error } = await sb
+    .from("songs")
+    .update({
+      title: input.title,
+      artist: input.artist || "",
+      cover: input.cover || null,
+      platform: input.platform || "spotify",
+      link: input.link,
+      year: input.year ? Number(input.year) : new Date().getFullYear(),
+    })
+    .eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
 export async function deleteSong(id: string): Promise<ActionResult> {
   if (!(await isAuthed())) return { ok: false, error: "Not authorized." };
   const sb = getSupabaseServer();
   if (!sb) return { ok: true, demo: true };
   const { error } = await sb.from("songs").delete().eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+// ── Request & booking status ─────────────────────────────────────────────────
+
+export async function updateRequestStatus(
+  id: string,
+  status: string
+): Promise<ActionResult> {
+  if (!(await isAuthed())) return { ok: false, error: "Not authorized." };
+  const sb = getSupabaseServer();
+  if (!sb) return { ok: true, demo: true };
+  const { error } = await sb.from("custom_requests").update({ status }).eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+export async function updateBookingStatus(
+  id: string,
+  status: string
+): Promise<ActionResult> {
+  if (!(await isAuthed())) return { ok: false, error: "Not authorized." };
+  const sb = getSupabaseServer();
+  if (!sb) return { ok: true, demo: true };
+  const { error } = await sb.from("bookings").update({ status }).eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+export async function updateBooking(
+  id: string,
+  patch: { date?: string; time?: string }
+): Promise<ActionResult> {
+  if (!(await isAuthed())) return { ok: false, error: "Not authorized." };
+  const sb = getSupabaseServer();
+  if (!sb) return { ok: true, demo: true };
+  const { error } = await sb
+    .from("bookings")
+    .update({ date: patch.date ?? null, time: patch.time ?? null })
+    .eq("id", id);
   if (error) return { ok: false, error: error.message };
   revalidatePath("/", "layout");
   return { ok: true };

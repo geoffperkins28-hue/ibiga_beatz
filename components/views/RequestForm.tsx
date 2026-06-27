@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Mic, Check } from "lucide-react";
+import { Check } from "lucide-react";
 import Field from "@/components/Field";
+import VoiceCapture from "@/components/VoiceCapture";
 import { requestGenres } from "@/lib/constants";
 import { submitCustomRequest } from "@/lib/actions";
 
@@ -17,6 +18,7 @@ const empty = {
   deadline: "",
   budget: "",
   notes: "",
+  voiceUrl: "",
 };
 
 export default function RequestForm() {
@@ -105,17 +107,7 @@ export default function RequestForm() {
           />
         </div>
 
-        {/* Voice Upload — wiring to Supabase Storage comes in a later milestone */}
-        <div className="border-2 border-dashed border-border rounded-2xl p-6 text-center hover:border-[#1DB954]/40 transition-colors cursor-pointer group">
-          <div className="w-12 h-12 rounded-full bg-[#1DB954]/10 flex items-center justify-center mx-auto mb-3 group-hover:bg-[#1DB954]/20 transition-colors">
-            <Mic size={20} className="text-[#1DB954]" />
-          </div>
-          <p className="text-sm font-semibold text-white">Upload Voice Idea</p>
-          <p className="text-xs text-muted-foreground mt-1">Hum, sing, or describe your melody — MP3, WAV, M4A up to 50MB</p>
-          <button className="mt-4 px-5 py-2 rounded-full border border-border text-sm text-muted-foreground hover:text-white hover:border-white/30 transition-colors">
-            Choose File
-          </button>
-        </div>
+        <VoiceCapture value={form.voiceUrl} onChange={(url) => update("voiceUrl", url)} />
 
         {error && <p className="text-sm text-red-400">{error}</p>}
 

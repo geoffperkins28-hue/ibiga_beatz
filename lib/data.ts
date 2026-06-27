@@ -54,9 +54,16 @@ function rowToRequest(r: any): CustomRequest {
   return {
     id: String(r.id),
     name: r.name,
+    email: r.email ?? "",
+    phone: r.phone ?? "",
     genre: r.genre ?? "",
     bpm: r.bpm ?? 0,
+    mood: r.mood ?? "",
+    refArtist: r.ref_artist ?? "",
+    deadline: r.deadline ?? "",
     budget: r.budget ?? "",
+    notes: r.notes ?? "",
+    voiceUrl: r.voice_url ?? null,
     status: r.status ?? "New",
     date: formatDate(r.created_at),
   };
@@ -66,9 +73,12 @@ function rowToBooking(r: any): Booking {
   return {
     id: String(r.id),
     name: r.name,
+    email: r.email ?? "",
+    phone: r.phone ?? "",
     service: r.service ?? "",
     date: r.date ?? "",
     time: r.time ?? "",
+    notes: r.notes ?? "",
     status: r.status ?? "Pending",
   };
 }

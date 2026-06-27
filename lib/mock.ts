@@ -59,15 +59,19 @@ export const mockClients: Client[] = [
   { id: "5", name: "Emeka Eze", email: "emeka@example.com", amount: "₦55,000", orders: 1, date: "Jun 8" },
 ];
 
+const reqDefaults = { email: "", phone: "", mood: "", refArtist: "", deadline: "", notes: "", voiceUrl: null };
+
 export const mockRequests: CustomRequest[] = [
-  { id: "1", name: "Tunde Bakare", genre: "Afrobeats", bpm: 105, budget: "₦80,000", status: "New", date: "Jun 20" },
-  { id: "2", name: "Chiamaka Obi", genre: "R&B", bpm: 88, budget: "₦60,000", status: "In Progress", date: "Jun 17" },
-  { id: "3", name: "Seun Adeyemi", genre: "Amapiano", bpm: 112, budget: "₦120,000", status: "Accepted", date: "Jun 14" },
-  { id: "4", name: "Blessing Nnaji", genre: "Hip-Hop", bpm: 140, budget: "₦45,000", status: "Completed", date: "Jun 9" },
+  { id: "1", name: "Tunde Bakare", genre: "Afrobeats", bpm: 105, budget: "₦80,000", status: "New", date: "Jun 20", ...reqDefaults },
+  { id: "2", name: "Chiamaka Obi", genre: "R&B", bpm: 88, budget: "₦60,000", status: "In Progress", date: "Jun 17", ...reqDefaults },
+  { id: "3", name: "Seun Adeyemi", genre: "Amapiano", bpm: 112, budget: "₦120,000", status: "Accepted", date: "Jun 14", ...reqDefaults },
+  { id: "4", name: "Blessing Nnaji", genre: "Hip-Hop", bpm: 140, budget: "₦45,000", status: "Completed", date: "Jun 9", ...reqDefaults },
 ];
 
+const bookDefaults = { email: "", phone: "", notes: "" };
+
 export const mockBookings: Booking[] = [
-  { id: "1", name: "Rashid Aliyu", service: "Mixing", date: "Jun 25, 2026", time: "2:00 PM", status: "Confirmed" },
-  { id: "2", name: "Fatima Sule", service: "Studio Session", date: "Jun 28, 2026", time: "10:00 AM", status: "Pending" },
-  { id: "3", name: "Mike Oladele", service: "Mastering", date: "Jul 2, 2026", time: "4:00 PM", status: "Confirmed" },
+  { id: "1", name: "Rashid Aliyu", service: "Mixing", date: "Jun 25, 2026", time: "2:00 PM", status: "Confirmed", ...bookDefaults },
+  { id: "2", name: "Fatima Sule", service: "Studio Session", date: "Jun 28, 2026", time: "10:00 AM", status: "Pending", ...bookDefaults },
+  { id: "3", name: "Mike Oladele", service: "Mastering", date: "Jul 2, 2026", time: "4:00 PM", status: "Confirmed", ...bookDefaults },
 ];
