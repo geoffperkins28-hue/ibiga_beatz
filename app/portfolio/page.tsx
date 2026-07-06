@@ -7,6 +7,9 @@ export const metadata: Metadata = {
   description: "The story, craft and credentials of Ibiga Beatz — Afrobeats, Amapiano, R&B and Trap producer.",
 };
 
+// Always render with the live producer profile (edits appear immediately).
+export const dynamic = "force-dynamic";
+
 export default async function PortfolioPage() {
   const profile = await getProfile();
   return <PortfolioView profile={profile} />;

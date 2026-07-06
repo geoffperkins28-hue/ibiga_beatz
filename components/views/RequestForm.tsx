@@ -97,7 +97,7 @@ export default function RequestForm() {
           <Field label="Mood / Vibe" value={form.mood} onChange={(v) => update("mood", v)} placeholder="e.g. Dark, Euphoric, Chill" />
           <Field label="Reference Artist" value={form.refArtist} onChange={(v) => update("refArtist", v)} placeholder="e.g. Burna Boy" />
           <Field label="Deadline" value={form.deadline} onChange={(v) => update("deadline", v)} placeholder="" type="date" />
-          <Field label="Budget (USD)" value={form.budget} onChange={(v) => update("budget", v)} placeholder="e.g. $150" />
+          <Field label="Budget (₦)" value={form.budget} onChange={(v) => update("budget", v)} placeholder="e.g. ₦150,000" />
         </div>
 
         <div>

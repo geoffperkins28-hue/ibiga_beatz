@@ -7,6 +7,9 @@ export const metadata: Metadata = {
   description: "Browse, preview and buy exclusive Afrobeats, Amapiano, Trap and R&B beats from Ibiga Beatz.",
 };
 
+// Always render with the live catalogue (new beats appear immediately).
+export const dynamic = "force-dynamic";
+
 export default async function StorePage({
   searchParams,
 }: {

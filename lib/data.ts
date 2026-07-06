@@ -47,6 +47,7 @@ function rowToSong(r: any): Song {
     platform: r.platform,
     link: r.link ?? "#",
     year: r.year ?? new Date().getFullYear(),
+    featured: r.featured ?? false,
   };
 }
 
@@ -132,6 +133,10 @@ export async function getProfile(): Promise<ProducerProfile> {
   return rowToProfile(data);
 }
 
+// Public catalogue (beats/songs/profile) falls back to mock data only when
+// Supabase isn't configured, or on a transient read error — so the storefront
+// never looks broken. A genuinely empty table now returns [] (it used to
+// wrongly resurface the mock seed once the producer cleared the catalogue).
 export async function getBeats(): Promise<Beat[]> {
   const sb = getSupabaseServer();
   if (!sb) return mockBeats;
@@ -139,7 +144,7 @@ export async function getBeats(): Promise<Beat[]> {
     .from("beats")
     .select("*")
     .order("created_at", { ascending: false });
-  if (error || !data || data.length === 0) return mockBeats;
+  if (error || !data) return mockBeats;
   return data.map(rowToBeat);
 }
 
@@ -149,16 +154,41 @@ export async function getSongs(): Promise<Song[]> {
   const { data, error } = await sb
     .from("songs")
     .select("*")
-    .order("sort_order", { ascending: true });
-  if (error || !data || data.length === 0) return mockSongs;
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: false });
+  if (error || !data) return mockSongs;
   return data.map(rowToSong);
 }
 
+// Real aggregation from the tables we have. Revenue/orders stats arrive with
+// payments; until then we surface honest counts instead of invented figures.
 export async function getDashStats(): Promise<DashStat[]> {
-  // Real aggregation comes later (needs orders/payments). Mock for now.
-  return mockDashStats;
+  const sb = getSupabaseServer();
+  if (!sb) return mockDashStats;
+
+  const [beats, songs, requests, bookings] = await Promise.all([
+    sb.from("beats").select("*", { count: "exact", head: true }),
+    sb.from("songs").select("*", { count: "exact", head: true }),
+    sb.from("custom_requests").select("status"),
+    sb.from("bookings").select("status"),
+  ]);
+
+  const reqRows = (requests.data as { status?: string }[] | null) ?? [];
+  const bkRows = (bookings.data as { status?: string }[] | null) ?? [];
+  const newReq = reqRows.filter((r) => r.status === "New").length;
+  const pendingBk = bkRows.filter((b) => b.status === "Pending").length;
+
+  return [
+    { label: "Beats in Store", value: String(beats.count ?? 0), icon: "ShoppingBag", change: "" },
+    { label: "Productions", value: String(songs.count ?? 0), icon: "Music", change: "" },
+    { label: "Custom Requests", value: String(reqRows.length), icon: "Mic", change: newReq ? `${newReq} new` : "" },
+    { label: "Bookings", value: String(bkRows.length), icon: "Calendar", change: pendingBk ? `${pendingBk} pending` : "" },
+  ];
 }
 
+// Admin-only reads return real rows (empty when there are none). They fall back
+// to mock only when Supabase isn't configured — never on empty — so the
+// dashboard never shows fabricated clients/requests/bookings in production.
 export async function getClients(): Promise<Client[]> {
   const sb = getSupabaseServer();
   if (!sb) return mockClients;
@@ -166,7 +196,7 @@ export async function getClients(): Promise<Client[]> {
     .from("clients")
     .select("*")
     .order("created_at", { ascending: false });
-  if (error || !data || data.length === 0) return mockClients;
+  if (error || !data) return [];
   return data.map(rowToClient);
 }
 
@@ -177,7 +207,7 @@ export async function getRequests(): Promise<CustomRequest[]> {
     .from("custom_requests")
     .select("*")
     .order("created_at", { ascending: false });
-  if (error || !data || data.length === 0) return mockRequests;
+  if (error || !data) return [];
   return data.map(rowToRequest);
 }
 
@@ -188,6 +218,6 @@ export async function getBookings(): Promise<Booking[]> {
     .from("bookings")
     .select("*")
     .order("created_at", { ascending: false });
-  if (error || !data || data.length === 0) return mockBookings;
+  if (error || !data) return [];
   return data.map(rowToBooking);
 }

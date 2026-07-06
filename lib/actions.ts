@@ -3,7 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { getSupabaseServer } from "./supabase/server";
 import { getCurrentUser } from "./auth";
-import { notifyProducer, requestEmail, bookingEmail } from "./notify";
+import {
+  notifyProducer,
+  notifyCustomer,
+  requestEmail,
+  bookingEmail,
+  customerRequestEmail,
+  customerBookingEmail,
+} from "./notify";
 import type { ProducerProfile } from "./types";
 
 const MEDIA_BUCKET = "media";
@@ -27,11 +34,16 @@ export interface AntiSpam {
   elapsedMs?: number;
 }
 
-/** Returns true if a public submission looks like a bot (silently drop it). */
+/**
+ * Returns true if a public submission looks like a bot (silently drop it).
+ * The honeypot is the reliable signal; the time-trap is deliberately lenient
+ * (browser autofill can legitimately fill a short form in ~1s) so it never
+ * silently swallows a real booking/request.
+ */
 function looksLikeBot(guard?: AntiSpam): boolean {
   if (!guard) return false;
   if (guard.hp && guard.hp.trim() !== "") return true;
-  if (typeof guard.elapsedMs === "number" && guard.elapsedMs < 3000) return true;
+  if (typeof guard.elapsedMs === "number" && guard.elapsedMs < 800) return true;
   return false;
 }
 
@@ -82,18 +94,25 @@ export async function submitCustomRequest(
   });
 
   if (error) return { ok: false, error: error.message };
-  await notifyProducer(
-    `New custom request — ${input.name}`,
-    requestEmail({
-      name: input.name,
-      email: input.email,
-      genre: input.genre,
-      bpm: input.bpm,
-      budget: input.budget,
-      notes: input.notes,
-      voiceUrl: input.voiceUrl,
-    })
-  );
+  await Promise.all([
+    notifyProducer(
+      `New custom request — ${input.name}`,
+      requestEmail({
+        name: input.name,
+        email: input.email,
+        genre: input.genre,
+        bpm: input.bpm,
+        budget: input.budget,
+        notes: input.notes,
+        voiceUrl: input.voiceUrl,
+      })
+    ),
+    notifyCustomer(
+      input.email,
+      "We received your custom beat request — Ibiga Beatz",
+      customerRequestEmail({ name: input.name, genre: input.genre, bpm: input.bpm, budget: input.budget })
+    ),
+  ]);
   return { ok: true };
 }
 
@@ -167,6 +186,8 @@ export async function createSignedUpload(
  * form. Locked to the `requests/voice/` folder; the form's honeypot + audio-only
  * client validation bound abuse.
  */
+const VOICE_EXTS = new Set(["webm", "mp3", "m4a", "mp4", "wav", "ogg", "aac"]);
+
 export async function createVoiceUpload(
   filename: string
 ): Promise<SignedUploadResult> {
@@ -174,6 +195,9 @@ export async function createVoiceUpload(
   if (!sb) return { error: "Storage isn't configured yet." };
 
   const ext = (filename.split(".").pop() || "webm").replace(/[^a-z0-9]/gi, "").toLowerCase();
+  // Server-side allowlist: this endpoint is unauthenticated, so only accept
+  // audio containers into the locked-down requests/voice/ folder.
+  if (!VOICE_EXTS.has(ext)) return { error: "Only audio recordings are allowed." };
   const path = `requests/voice/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
   const { data, error } = await sb.storage.from(MEDIA_BUCKET).createSignedUploadUrl(path);
@@ -252,6 +276,16 @@ export async function deleteBeat(id: string): Promise<ActionResult> {
   return { ok: true };
 }
 
+export async function setBeatSold(id: string, sold: boolean): Promise<ActionResult> {
+  if (!(await isAuthed())) return { ok: false, error: "Not authorized." };
+  const sb = getSupabaseServer();
+  if (!sb) return { ok: true, demo: true };
+  const { error } = await sb.from("beats").update({ sold }).eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
 // ── Productions (songs) management ───────────────────────────────────────────
 
 export interface SongInput {
@@ -316,6 +350,30 @@ export async function deleteSong(id: string): Promise<ActionResult> {
   if (!sb) return { ok: true, demo: true };
   const { error } = await sb.from("songs").delete().eq("id", id);
   if (error) return { ok: false, error: error.message };
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+export async function setSongFeatured(id: string, featured: boolean): Promise<ActionResult> {
+  if (!(await isAuthed())) return { ok: false, error: "Not authorized." };
+  const sb = getSupabaseServer();
+  if (!sb) return { ok: true, demo: true };
+  const { error } = await sb.from("songs").update({ featured }).eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+/** Persists a new display order by writing each song's index as its sort_order. */
+export async function reorderSongs(orderedIds: string[]): Promise<ActionResult> {
+  if (!(await isAuthed())) return { ok: false, error: "Not authorized." };
+  const sb = getSupabaseServer();
+  if (!sb) return { ok: true, demo: true };
+  const results = await Promise.all(
+    orderedIds.map((id, i) => sb.from("songs").update({ sort_order: i }).eq("id", id))
+  );
+  const failed = results.find((r) => r.error);
+  if (failed?.error) return { ok: false, error: failed.error.message };
   revalidatePath("/", "layout");
   return { ok: true };
 }
@@ -398,9 +456,16 @@ export async function submitBooking(
   });
 
   if (error) return { ok: false, error: error.message };
-  await notifyProducer(
-    `New booking — ${input.name}`,
-    bookingEmail({ name: input.name, email: input.email, service: input.service, date: input.date })
-  );
+  await Promise.all([
+    notifyProducer(
+      `New booking — ${input.name}`,
+      bookingEmail({ name: input.name, email: input.email, service: input.service, date: input.date })
+    ),
+    notifyCustomer(
+      input.email,
+      "Your booking request is in — Ibiga Beatz",
+      customerBookingEmail({ name: input.name, service: input.service, date: input.date })
+    ),
+  ]);
   return { ok: true };
 }

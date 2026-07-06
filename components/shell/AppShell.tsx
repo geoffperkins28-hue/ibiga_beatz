@@ -18,6 +18,8 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
+import { PlayerProvider, usePlayer } from "@/lib/player";
+import Player from "@/components/Player";
 
 type NavItem = { href: string; icon: React.ElementType; label: string };
 
@@ -35,10 +37,19 @@ function isActive(pathname: string, href: string) {
 }
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
+  return (
+    <PlayerProvider>
+      <AppShellInner>{children}</AppShellInner>
+    </PlayerProvider>
+  );
+}
+
+function AppShellInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const { current } = usePlayer();
 
   // The login page renders itself full-screen — no chrome.
   if (pathname === "/admin/login") {
@@ -177,9 +188,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto no-scrollbar scroll-area">
-          <div className="p-6 max-w-6xl mx-auto">{children}</div>
+          <div className={`p-6 max-w-6xl mx-auto ${current ? "pb-28" : ""}`}>{children}</div>
         </div>
       </main>
+
+      {/* Global beat player — persists across page navigation */}
+      <Player />
     </div>
   );
 }

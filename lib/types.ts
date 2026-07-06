@@ -32,6 +32,7 @@ export interface Song {
   platform: Platform;
   link: string;
   year: number;
+  featured?: boolean;
 }
 
 export interface DashStat {

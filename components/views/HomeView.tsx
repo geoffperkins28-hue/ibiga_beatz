@@ -88,7 +88,7 @@ export default function HomeView({
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {beats.slice(0, 4).map((beat) => (
-            <BeatCard key={beat.id} beat={beat} />
+            <BeatCard key={beat.id} beat={beat} queue={beats.slice(0, 4)} />
           ))}
         </div>
       </section>
@@ -103,7 +103,9 @@ export default function HomeView({
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {songs.slice(0, 3).map((song) => (
-            <SongCard key={song.id} song={song} />
+            <Link key={song.id} href="/songs">
+              <SongCard song={song} />
+            </Link>
           ))}
         </div>
       </section>

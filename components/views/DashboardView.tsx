@@ -20,6 +20,9 @@ import {
   Loader2,
   Music,
   Image as ImageIcon,
+  Star,
+  ChevronUp,
+  ChevronDown,
 } from "lucide-react";
 import type {
   Beat,
@@ -31,14 +34,18 @@ import type {
   ProducerProfile,
 } from "@/lib/types";
 import { statusColors } from "@/lib/constants";
+import { formatNaira } from "@/lib/format";
 import { getEmbed } from "@/lib/embed";
 import {
   createBeat,
   updateBeat,
   deleteBeat,
+  setBeatSold,
   createSong,
   updateSong,
   deleteSong,
+  setSongFeatured,
+  reorderSongs,
   updateRequestStatus,
   updateBookingStatus,
   updateBooking,
@@ -55,6 +62,7 @@ const statIcons: Record<string, React.ElementType> = {
   ShoppingBag,
   Mic,
   Calendar,
+  Music,
 };
 
 type Tab = "overview" | "beats" | "productions" | "requests" | "bookings" | "clients";
@@ -113,6 +121,7 @@ export default function DashboardView({
   const [beatModal, setBeatModal] = useState<{ initial: Beat | null } | null>(null);
   const [songModal, setSongModal] = useState<{ initial: Song | null } | null>(null);
   const [clientQuery, setClientQuery] = useState("");
+  const [notifOpen, setNotifOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const filteredClients = clients.filter((c) => {
@@ -136,12 +145,43 @@ export default function DashboardView({
     });
   };
 
+  const toggleSold = (id: string, sold: boolean) => {
+    setError(null);
+    startTransition(async () => {
+      const res = await setBeatSold(id, sold);
+      if (res.ok) refresh();
+      else setError(res.error ?? "Failed to update.");
+    });
+  };
+
   const removeSong = (id: string, title: string) => {
     if (!confirm(`Remove "${title}" from productions?`)) return;
     startTransition(async () => {
       const res = await deleteSong(id);
       if (res.ok) refresh();
       else setError(res.error ?? "Failed to delete.");
+    });
+  };
+
+  const toggleFeatured = (id: string, featured: boolean) => {
+    setError(null);
+    startTransition(async () => {
+      const res = await setSongFeatured(id, featured);
+      if (res.ok) refresh();
+      else setError(res.error ?? "Failed to update.");
+    });
+  };
+
+  const moveSong = (index: number, dir: -1 | 1) => {
+    const target = index + dir;
+    if (target < 0 || target >= songs.length) return;
+    const ids = songs.map((s) => s.id);
+    [ids[index], ids[target]] = [ids[target], ids[index]];
+    setError(null);
+    startTransition(async () => {
+      const res = await reorderSongs(ids);
+      if (res.ok) refresh();
+      else setError(res.error ?? "Failed to reorder.");
     });
   };
 
@@ -163,6 +203,21 @@ export default function DashboardView({
     });
   };
 
+  // Actionable alerts feed for the bell dropdown — new requests + pending bookings.
+  const notifications = [
+    ...requests
+      .filter((r) => r.status === "New")
+      .map((r) => ({ key: `r-${r.id}`, title: `New request — ${r.name}`, sub: [r.genre, r.date].filter(Boolean).join(" · "), tab: "requests" as Tab })),
+    ...bookings
+      .filter((b) => b.status === "Pending")
+      .map((b) => ({ key: `b-${b.id}`, title: `Booking — ${b.name}`, sub: [b.service, b.date].filter(Boolean).join(" · "), tab: "bookings" as Tab })),
+  ];
+
+  const openTab = (tab: Tab) => {
+    setActiveTab(tab);
+    setNotifOpen(false);
+  };
+
   return (
     <div className="space-y-6 min-w-0">
       {/* Sticky header + tabs so navigation stays put while content scrolls */}
@@ -176,14 +231,42 @@ export default function DashboardView({
             <Link href="/admin/settings" className="w-9 h-9 rounded-full bg-[#282828] flex items-center justify-center hover:bg-[#383838] transition-colors" aria-label="Settings">
               <Settings size={16} className="text-muted-foreground" />
             </Link>
-            <button className="relative w-9 h-9 rounded-full bg-[#282828] flex items-center justify-center hover:bg-[#383838] transition-colors" aria-label="Notifications">
-              <Bell size={16} className="text-muted-foreground" />
-              {totalAlerts > 0 && (
-                <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-[#1DB954] text-black text-[10px] font-bold flex items-center justify-center">
-                  {totalAlerts}
-                </span>
+            <div className="relative">
+              <button
+                onClick={() => setNotifOpen((o) => !o)}
+                className="relative w-9 h-9 rounded-full bg-[#282828] flex items-center justify-center hover:bg-[#383838] transition-colors"
+                aria-label="Notifications"
+              >
+                <Bell size={16} className="text-muted-foreground" />
+                {totalAlerts > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-[#1DB954] text-black text-[10px] font-bold flex items-center justify-center">
+                    {totalAlerts}
+                  </span>
+                )}
+              </button>
+              {notifOpen && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setNotifOpen(false)} />
+                  <div className="absolute right-0 mt-2 w-72 max-h-80 overflow-y-auto no-scrollbar bg-card border border-border rounded-2xl shadow-xl z-40 p-2">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 py-2">Notifications</p>
+                    {notifications.length === 0 ? (
+                      <p className="text-sm text-muted-foreground px-3 py-6 text-center">You&apos;re all caught up 🎉</p>
+                    ) : (
+                      notifications.map((n) => (
+                        <button
+                          key={n.key}
+                          onClick={() => openTab(n.tab)}
+                          className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-[#282828] transition-colors"
+                        >
+                          <p className="text-sm font-medium text-white truncate">{n.title}</p>
+                          {n.sub && <p className="text-xs text-muted-foreground truncate">{n.sub}</p>}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </>
               )}
-            </button>
+            </div>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={profile.avatarUrl} alt={profile.displayName} className="w-9 h-9 rounded-full object-cover" />
           </div>
@@ -286,15 +369,25 @@ export default function DashboardView({
           </div>
           <div className="space-y-2">
             {beats.map((beat) => (
-              <div key={beat.id} className="flex items-center gap-4 bg-card border border-border rounded-2xl p-4 hover:bg-[#282828] transition-colors group">
+              <div key={beat.id} className={`flex items-center gap-4 bg-card border border-border rounded-2xl p-4 hover:bg-[#282828] transition-colors group ${beat.sold ? "opacity-60" : ""}`}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={beat.image} alt={beat.title} className="w-12 h-12 rounded-xl object-cover shrink-0" />
                 <div className="min-w-0 flex-1">
-                  <p className="font-semibold text-white text-sm truncate">{beat.title}</p>
+                  <p className="font-semibold text-white text-sm truncate flex items-center gap-2">
+                    {beat.title}
+                    {beat.sold && <span className="text-[10px] font-semibold text-red-400 bg-red-500/15 px-2 py-0.5 rounded-full shrink-0">Sold</span>}
+                  </p>
                   <p className="text-xs text-muted-foreground truncate">{beat.genre} · {beat.bpm} BPM · {beat.mood}</p>
                 </div>
-                <span className="text-sm font-bold text-[#1DB954] shrink-0">${beat.price}</span>
+                <span className="text-sm font-bold text-[#1DB954] shrink-0">{formatNaira(beat.price)}</span>
                 <span className="text-xs text-muted-foreground shrink-0 hidden sm:block">{beat.plays.toLocaleString()} plays</span>
+                <button
+                  onClick={() => toggleSold(beat.id, !beat.sold)}
+                  disabled={pending}
+                  className="px-3 py-1.5 rounded-full bg-[#282828] text-xs font-medium text-muted-foreground hover:text-white transition-colors shrink-0 disabled:opacity-50 whitespace-nowrap"
+                >
+                  {beat.sold ? "Mark available" : "Mark sold"}
+                </button>
                 <button
                   onClick={() => setBeatModal({ initial: beat })}
                   className="w-8 h-8 rounded-full bg-[#282828] flex items-center justify-center hover:bg-[#383838] transition-colors shrink-0"
@@ -329,19 +422,46 @@ export default function DashboardView({
             </button>
           </div>
           <div className="space-y-2">
-            {songs.map((song) => {
+            {songs.map((song, index) => {
               const playable = Boolean(getEmbed(song.link));
               return (
-                <div key={song.id} className="flex items-center gap-4 bg-card border border-border rounded-2xl p-4 group">
+                <div key={song.id} className="flex items-center gap-3 bg-card border border-border rounded-2xl p-4 group">
+                  <div className="flex flex-col shrink-0">
+                    <button
+                      onClick={() => moveSong(index, -1)}
+                      disabled={pending || index === 0}
+                      className="w-6 h-5 flex items-center justify-center rounded-md hover:bg-[#282828] transition-colors disabled:opacity-30"
+                      aria-label="Move up"
+                    >
+                      <ChevronUp size={14} className="text-muted-foreground" />
+                    </button>
+                    <button
+                      onClick={() => moveSong(index, 1)}
+                      disabled={pending || index === songs.length - 1}
+                      className="w-6 h-5 flex items-center justify-center rounded-md hover:bg-[#282828] transition-colors disabled:opacity-30"
+                      aria-label="Move down"
+                    >
+                      <ChevronDown size={14} className="text-muted-foreground" />
+                    </button>
+                  </div>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={song.cover} alt={song.title} className="w-12 h-12 rounded-xl object-cover shrink-0" />
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold text-white text-sm truncate">{song.title}</p>
                     <p className="text-xs text-muted-foreground truncate">{song.artist} · {song.year}</p>
                   </div>
-                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${playable ? "bg-[#1DB954]/20 text-[#1DB954]" : "bg-yellow-500/20 text-yellow-400"}`}>
+                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 hidden sm:inline ${playable ? "bg-[#1DB954]/20 text-[#1DB954]" : "bg-yellow-500/20 text-yellow-400"}`}>
                     {playable ? "playable" : "no link"}
                   </span>
+                  <button
+                    onClick={() => toggleFeatured(song.id, !song.featured)}
+                    disabled={pending}
+                    className="w-8 h-8 rounded-full bg-[#282828] flex items-center justify-center hover:bg-[#383838] transition-colors shrink-0 disabled:opacity-50"
+                    aria-label={song.featured ? "Unfeature song" : "Feature song"}
+                    title={song.featured ? "Featured — click to unfeature" : "Feature this song"}
+                  >
+                    <Star size={13} fill={song.featured ? "#1DB954" : "none"} className={song.featured ? "text-[#1DB954]" : "text-muted-foreground"} />
+                  </button>
                   <button
                     onClick={() => setSongModal({ initial: song })}
                     className="w-8 h-8 rounded-full bg-[#282828] flex items-center justify-center hover:bg-[#383838] transition-colors shrink-0"
@@ -685,7 +805,7 @@ function BeatModal({ initial, onClose, onSaved }: { initial: Beat | null; onClos
           <input className={inputCls} placeholder="Genre" value={f.genre} onChange={(e) => up("genre", e.target.value)} />
           <input className={inputCls} placeholder="BPM" value={f.bpm} onChange={(e) => up("bpm", e.target.value)} />
           <input className={inputCls} placeholder="Mood" value={f.mood} onChange={(e) => up("mood", e.target.value)} />
-          <input className={inputCls} placeholder="Price (USD)" value={f.price} onChange={(e) => up("price", e.target.value)} />
+          <input className={inputCls} placeholder="Price (₦)" value={f.price} onChange={(e) => up("price", e.target.value)} />
         </div>
         <input className={inputCls} placeholder="Duration (e.g. 2:45)" value={f.duration} onChange={(e) => up("duration", e.target.value)} />
         <FileField label="Cover art" kind="image" folder="beats/covers" value={f.image} onUploaded={(url) => up("image", url)} />

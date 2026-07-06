@@ -1,36 +1,42 @@
 "use client";
 
-import { useState } from "react";
 import { Play, Pause } from "lucide-react";
 import type { Beat } from "@/lib/types";
+import { formatNaira } from "@/lib/format";
+import { usePlayer } from "@/lib/player";
 
-export default function BeatCard({ beat }: { beat: Beat }) {
-  const [hovered, setHovered] = useState(false);
-  const [playing, setPlaying] = useState(false);
+export default function BeatCard({ beat, queue }: { beat: Beat; queue?: Beat[] }) {
+  const { current, playing, play, toggle } = usePlayer();
+  const isCurrent = current?.id === beat.id;
+  const isPlaying = isCurrent && playing;
+
+  const onPlay = () => {
+    if (isCurrent) toggle();
+    else play(beat, queue);
+  };
 
   return (
     <div
       className="bg-card rounded-2xl overflow-hidden border border-border hover:bg-[#282828] transition-all duration-200 group cursor-pointer"
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      onClick={onPlay}
     >
       <div className="relative aspect-square">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={beat.image} alt={beat.title} className="w-full h-full object-cover" />
+        <img src={beat.image} alt={beat.title} className={`w-full h-full object-cover ${beat.sold ? "opacity-60" : ""}`} />
         <div
           className={`absolute inset-0 bg-black/40 flex items-center justify-center transition-opacity duration-200 ${
-            hovered ? "opacity-100" : "opacity-0"
+            isPlaying ? "opacity-100" : "opacity-0 group-hover:opacity-100"
           }`}
         >
           <button
             onClick={(e) => {
               e.stopPropagation();
-              setPlaying((p) => !p);
+              onPlay();
             }}
             className="w-12 h-12 rounded-full bg-[#1DB954] flex items-center justify-center hover:scale-105 transition-transform shadow-lg"
-            aria-label={playing ? "Pause" : "Play"}
+            aria-label={isPlaying ? "Pause" : "Play"}
           >
-            {playing ? <Pause size={20} fill="black" /> : <Play size={20} fill="black" />}
+            {isPlaying ? <Pause size={20} fill="black" /> : <Play size={20} fill="black" />}
           </button>
         </div>
         {beat.sold && (
@@ -45,7 +51,7 @@ export default function BeatCard({ beat }: { beat: Beat }) {
           {beat.genre} · {beat.bpm} BPM
         </p>
         <div className="flex items-center justify-between mt-2">
-          <span className="text-sm font-bold text-[#1DB954]">${beat.price}</span>
+          <span className="text-sm font-bold text-[#1DB954]">{formatNaira(beat.price)}</span>
           <span className="text-[10px] text-muted-foreground">{beat.plays.toLocaleString()} plays</span>
         </div>
       </div>

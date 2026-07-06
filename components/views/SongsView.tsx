@@ -104,7 +104,10 @@ export default function SongsView({ songs }: { songs: Song[] }) {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={song.cover} alt={song.title} className="w-12 h-12 rounded-xl object-cover shrink-0" />
             <div className="min-w-0 flex-1">
-              <p className="font-semibold text-white text-sm truncate">{song.title}</p>
+              <p className="font-semibold text-white text-sm truncate flex items-center gap-2">
+                {song.title}
+                {song.featured && <span className="text-[10px] font-semibold text-[#1DB954] bg-[#1DB954]/15 px-2 py-0.5 rounded-full shrink-0">Featured</span>}
+              </p>
               <p className="text-xs text-muted-foreground">{song.artist}</p>
             </div>
             <span className="text-xs text-muted-foreground">{song.year}</span>

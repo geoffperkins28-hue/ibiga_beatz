@@ -26,14 +26,14 @@ export const defaultProfile: ProducerProfile = {
 // the data layer in lib/data.ts pulls from Supabase instead.
 
 export const mockBeats: Beat[] = [
-  { id: "1", title: "Midnight Wave", genre: "Afrobeats", bpm: 102, mood: "Dark", price: 49, duration: "2:45", plays: 3842, image: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&h=400&fit=crop&auto=format" },
-  { id: "2", title: "Lagos Nights", genre: "Afropop", bpm: 98, mood: "Vibes", price: 75, duration: "3:12", plays: 7210, image: "https://images.unsplash.com/photo-1598387993441-a364f854c3e1?w=400&h=400&fit=crop&auto=format" },
-  { id: "3", title: "Gold Rush", genre: "Trap", bpm: 140, mood: "Aggressive", price: 89, duration: "2:58", plays: 5430, image: "https://images.unsplash.com/photo-1571330735066-03aaa9429d89?w=400&h=400&fit=crop&auto=format" },
-  { id: "4", title: "Ocean Drive", genre: "R&B", bpm: 85, mood: "Chill", price: 59, duration: "3:30", plays: 4120, image: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&h=400&fit=crop&auto=format" },
-  { id: "5", title: "Savanna Dusk", genre: "Afrobeats", bpm: 110, mood: "Euphoric", price: 69, duration: "2:22", plays: 9034, image: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400&h=400&fit=crop&auto=format" },
-  { id: "6", title: "Street Anthem", genre: "Hip-Hop", bpm: 92, mood: "Hard", price: 95, duration: "3:05", plays: 6700, image: "https://images.unsplash.com/photo-1561070791-2526d30994b5?w=400&h=400&fit=crop&auto=format" },
-  { id: "7", title: "Neon Pulse", genre: "Amapiano", bpm: 115, mood: "Party", price: 79, duration: "4:10", plays: 11250, image: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400&h=400&fit=crop&auto=format" },
-  { id: "8", title: "Whisper", genre: "R&B", bpm: 72, mood: "Romantic", price: 55, duration: "3:48", plays: 2980, image: "https://images.unsplash.com/photo-1526478806334-5fd488fcaabc?w=400&h=400&fit=crop&auto=format" },
+  { id: "1", title: "Midnight Wave", genre: "Afrobeats", bpm: 102, mood: "Dark", price: 49000, duration: "2:45", plays: 3842, image: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&h=400&fit=crop&auto=format" },
+  { id: "2", title: "Lagos Nights", genre: "Afropop", bpm: 98, mood: "Vibes", price: 75000, duration: "3:12", plays: 7210, image: "https://images.unsplash.com/photo-1598387993441-a364f854c3e1?w=400&h=400&fit=crop&auto=format" },
+  { id: "3", title: "Gold Rush", genre: "Trap", bpm: 140, mood: "Aggressive", price: 89000, duration: "2:58", plays: 5430, image: "https://images.unsplash.com/photo-1571330735066-03aaa9429d89?w=400&h=400&fit=crop&auto=format" },
+  { id: "4", title: "Ocean Drive", genre: "R&B", bpm: 85, mood: "Chill", price: 59000, duration: "3:30", plays: 4120, image: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&h=400&fit=crop&auto=format" },
+  { id: "5", title: "Savanna Dusk", genre: "Afrobeats", bpm: 110, mood: "Euphoric", price: 69000, duration: "2:22", plays: 9034, image: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400&h=400&fit=crop&auto=format" },
+  { id: "6", title: "Street Anthem", genre: "Hip-Hop", bpm: 92, mood: "Hard", price: 95000, duration: "3:05", plays: 6700, image: "https://images.unsplash.com/photo-1561070791-2526d30994b5?w=400&h=400&fit=crop&auto=format" },
+  { id: "7", title: "Neon Pulse", genre: "Amapiano", bpm: 115, mood: "Party", price: 79000, duration: "4:10", plays: 11250, image: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400&h=400&fit=crop&auto=format" },
+  { id: "8", title: "Whisper", genre: "R&B", bpm: 72, mood: "Romantic", price: 55000, duration: "3:48", plays: 2980, image: "https://images.unsplash.com/photo-1526478806334-5fd488fcaabc?w=400&h=400&fit=crop&auto=format" },
 ];
 
 export const mockSongs: Song[] = [
