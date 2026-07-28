@@ -24,6 +24,8 @@ export interface Beat {
   notes?: string;
   /** Path in the private "deliverables" bucket — the file a buyer receives. */
   deliverablePath?: string;
+  /** true = free direct download (tagged); false = paid/exclusive order flow. */
+  isFree?: boolean;
 }
 
 export type Platform = "spotify" | "youtube" | "apple";

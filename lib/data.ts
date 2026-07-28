@@ -39,6 +39,7 @@ function rowToBeat(r: any): Beat {
     key: r.key ?? "",
     notes: r.notes ?? "",
     deliverablePath: r.deliverable_path ?? "",
+    isFree: r.is_free ?? false,
   };
 }
 

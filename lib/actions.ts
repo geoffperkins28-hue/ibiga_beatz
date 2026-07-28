@@ -247,6 +247,7 @@ export interface BeatInput {
   key: string;
   notes: string;
   deliverablePath: string;
+  isFree: boolean;
 }
 
 export async function createBeat(input: BeatInput): Promise<ActionResult> {
@@ -267,6 +268,7 @@ export async function createBeat(input: BeatInput): Promise<ActionResult> {
     key: input.key || null,
     notes: input.notes || null,
     deliverable_path: input.deliverablePath || null,
+    is_free: input.isFree,
     plays: 0,
   };
   const { error } = await insertWithNewColsFallback(sb, row);
@@ -275,15 +277,15 @@ export async function createBeat(input: BeatInput): Promise<ActionResult> {
   return { ok: true };
 }
 
-/** True when a write failed only because a newer migration (0004/0005) isn't applied yet. */
+/** True when a write failed only because a newer migration (0004/0005/0006) isn't applied yet. */
 function isMissingNewCols(msg?: string): boolean {
-  return Boolean(msg && /schema cache|column/i.test(msg) && /\bkey\b|\bnotes\b|deliverable_path/i.test(msg));
+  return Boolean(msg && /schema cache|column/i.test(msg) && /\bkey\b|\bnotes\b|deliverable_path|is_free/i.test(msg));
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 function stripNewCols(row: any) {
-  const { key, notes, deliverable_path, ...rest } = row;
-  void key; void notes; void deliverable_path;
+  const { key, notes, deliverable_path, is_free, ...rest } = row;
+  void key; void notes; void deliverable_path; void is_free;
   return rest;
 }
 
@@ -322,6 +324,7 @@ export async function updateBeat(id: string, input: BeatInput): Promise<ActionRe
     key: input.key || null,
     notes: input.notes || null,
     deliverable_path: input.deliverablePath || null,
+    is_free: input.isFree,
   });
   if (error) return { ok: false, error: error.message };
   revalidatePath("/", "layout");

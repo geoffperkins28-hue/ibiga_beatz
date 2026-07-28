@@ -2,9 +2,9 @@
 
 import { useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { ArrowLeft, Play, Pause, Check, ShieldCheck, ShoppingCart, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Play, Pause, Check, ShieldCheck, ShoppingCart, CheckCircle2, Download } from "lucide-react";
 import type { Beat } from "@/lib/types";
-import { formatNaira } from "@/lib/format";
+import { formatNaira, priceLabel, forceDownloadUrl } from "@/lib/format";
 import { usePlayer } from "@/lib/player";
 import { submitOrder } from "@/lib/actions";
 import Honeypot from "@/components/Honeypot";
@@ -15,6 +15,13 @@ const EXCLUSIVE_INCLUDES = [
   "Full MP3 + WAV master delivered instantly",
   "Unlimited commercial use & distribution",
   "Producer credit: “Prod. Ibiga Beatz”",
+];
+
+const FREE_INCLUDES = [
+  "Free tagged MP3 — download instantly",
+  "Use it for demos, freestyles & non-profit projects",
+  "Producer credit required: “Prod. Ibiga Beatz”",
+  "For paid releases, order an exclusive licence instead",
 ];
 
 function MetaTile({ label, value }: { label: string; value: string }) {
@@ -83,9 +90,9 @@ export default function BeatDetailView({ beat, related }: { beat: Beat; related:
           <div className="mt-6 bg-card border border-border rounded-3xl p-5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-2xl font-bold text-white">{formatNaira(beat.price)}</p>
+                <p className="text-2xl font-bold text-white">{priceLabel(beat)}</p>
                 <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                  <ShieldCheck size={12} className="text-[#1DB954]" /> Exclusive license
+                  <ShieldCheck size={12} className="text-[#1DB954]" /> {beat.isFree ? "Free download" : "Exclusive license"}
                 </p>
               </div>
               <button
@@ -99,7 +106,7 @@ export default function BeatDetailView({ beat, related }: { beat: Beat; related:
             </div>
 
             <ul className="mt-4 space-y-2">
-              {EXCLUSIVE_INCLUDES.map((item) => (
+              {(beat.isFree ? FREE_INCLUDES : EXCLUSIVE_INCLUDES).map((item) => (
                 <li key={item} className="flex items-start gap-2 text-sm text-muted-foreground">
                   <Check size={15} className="text-[#1DB954] mt-0.5 shrink-0" /> {item}
                 </li>
@@ -107,7 +114,23 @@ export default function BeatDetailView({ beat, related }: { beat: Beat; related:
             </ul>
 
             <div className="mt-5">
-              <OrderPanel beat={beat} />
+              {beat.isFree ? (
+                hasAudio ? (
+                  <a
+                    href={forceDownloadUrl(beat.audioUrl!)}
+                    download
+                    className="w-full py-3 rounded-full bg-[#1DB954] text-black font-semibold flex items-center justify-center gap-2 hover:bg-[#1ed760] transition-colors"
+                  >
+                    <Download size={16} /> Download free
+                  </a>
+                ) : (
+                  <button disabled className="w-full py-3 rounded-full bg-[#282828] text-muted-foreground font-semibold cursor-not-allowed">
+                    No file uploaded yet
+                  </button>
+                )
+              ) : (
+                <OrderPanel beat={beat} />
+              )}
             </div>
           </div>
 

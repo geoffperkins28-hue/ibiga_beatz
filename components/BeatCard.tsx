@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Play, Pause } from "lucide-react";
 import type { Beat } from "@/lib/types";
-import { formatNaira } from "@/lib/format";
+import { priceLabel } from "@/lib/format";
 import { usePlayer } from "@/lib/player";
 
 export default function BeatCard({ beat, queue }: { beat: Beat; queue?: Beat[] }) {
@@ -39,11 +39,15 @@ export default function BeatCard({ beat, queue }: { beat: Beat; queue?: Beat[] }
             {isPlaying ? <Pause size={20} fill="black" /> : <Play size={20} fill="black" />}
           </button>
         </div>
-        {beat.sold && (
+        {beat.isFree ? (
+          <div className="absolute top-2 right-2 bg-[#1DB954] text-black text-[10px] font-bold px-2 py-0.5 rounded-full">
+            Free
+          </div>
+        ) : beat.sold ? (
           <div className="absolute top-2 right-2 bg-black/80 text-xs text-red-400 font-semibold px-2 py-0.5 rounded-full">
             Sold
           </div>
-        )}
+        ) : null}
       </div>
       <div className="p-3">
         <p className="font-semibold text-white text-sm truncate">{beat.title}</p>
@@ -51,7 +55,7 @@ export default function BeatCard({ beat, queue }: { beat: Beat; queue?: Beat[] }
           {beat.genre} · {beat.bpm} BPM
         </p>
         <div className="flex items-center justify-between mt-2">
-          <span className="text-sm font-bold text-[#1DB954]">{formatNaira(beat.price)}</span>
+          <span className="text-sm font-bold text-[#1DB954]">{priceLabel(beat)}</span>
           <span className="text-[10px] text-muted-foreground">{beat.plays.toLocaleString()} plays</span>
         </div>
       </div>

@@ -37,7 +37,7 @@ import type {
   ProducerProfile,
 } from "@/lib/types";
 import { statusColors } from "@/lib/constants";
-import { formatNaira } from "@/lib/format";
+import { formatNaira, priceLabel } from "@/lib/format";
 import { getEmbed } from "@/lib/embed";
 import {
   createBeat,
@@ -411,19 +411,22 @@ export default function DashboardView({
                 <div className="min-w-0 flex-1">
                   <p className="font-semibold text-white text-sm truncate flex items-center gap-2">
                     {beat.title}
+                    {beat.isFree && <span className="text-[10px] font-semibold text-[#1DB954] bg-[#1DB954]/15 px-2 py-0.5 rounded-full shrink-0">Free</span>}
                     {beat.sold && <span className="text-[10px] font-semibold text-red-400 bg-red-500/15 px-2 py-0.5 rounded-full shrink-0">Sold</span>}
                   </p>
                   <p className="text-xs text-muted-foreground truncate">{beat.genre} · {beat.bpm} BPM · {beat.mood}</p>
                 </div>
-                <span className="text-sm font-bold text-[#1DB954] shrink-0">{formatNaira(beat.price)}</span>
+                <span className="text-sm font-bold text-[#1DB954] shrink-0">{priceLabel(beat)}</span>
                 <span className="text-xs text-muted-foreground shrink-0 hidden sm:block">{beat.plays.toLocaleString()} plays</span>
-                <button
-                  onClick={() => toggleSold(beat.id, !beat.sold)}
-                  disabled={pending}
-                  className="px-3 py-1.5 rounded-full bg-[#282828] text-xs font-medium text-muted-foreground hover:text-white transition-colors shrink-0 disabled:opacity-50 whitespace-nowrap"
-                >
-                  {beat.sold ? "Mark available" : "Mark sold"}
-                </button>
+                {!beat.isFree && (
+                  <button
+                    onClick={() => toggleSold(beat.id, !beat.sold)}
+                    disabled={pending}
+                    className="px-3 py-1.5 rounded-full bg-[#282828] text-xs font-medium text-muted-foreground hover:text-white transition-colors shrink-0 disabled:opacity-50 whitespace-nowrap"
+                  >
+                    {beat.sold ? "Mark available" : "Mark sold"}
+                  </button>
+                )}
                 <button
                   onClick={() => setBeatModal({ initial: beat })}
                   className="w-8 h-8 rounded-full bg-[#282828] flex items-center justify-center hover:bg-[#383838] transition-colors shrink-0"
@@ -888,12 +891,14 @@ function BeatModal({ initial, onClose, onSaved }: { initial: Beat | null; onClos
           key: initial.key ?? "",
           notes: initial.notes ?? "",
           deliverablePath: initial.deliverablePath ?? "",
+          isFree: initial.isFree ?? false,
         }
-      : { title: "", genre: "Afrobeats", bpm: "", mood: "", price: "", duration: "", image: "", audioUrl: "", key: "", notes: "", deliverablePath: "" }
+      : { title: "", genre: "Afrobeats", bpm: "", mood: "", price: "", duration: "", image: "", audioUrl: "", key: "", notes: "", deliverablePath: "", isFree: false }
   );
   const [err, setErr] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const up = (k: keyof BeatInput, v: string) => setF((s) => ({ ...s, [k]: v }));
+  const setFree = (v: boolean) => setF((s) => ({ ...s, isFree: v }));
 
   const save = () =>
     start(async () => {
@@ -910,12 +915,37 @@ function BeatModal({ initial, onClose, onSaved }: { initial: Beat | null; onClos
   return (
     <Modal title={initial ? "Edit Beat" : "Upload Beat"} onClose={onClose}>
       <div className="space-y-4">
+        {/* Access type — free direct download vs paid/exclusive order */}
+        <div className="grid grid-cols-2 gap-2 bg-[#282828] rounded-2xl p-1">
+          <button
+            type="button"
+            onClick={() => setFree(false)}
+            className={`py-2 rounded-xl text-sm font-semibold transition-colors ${!f.isFree ? "bg-[#1DB954] text-black" : "text-muted-foreground hover:text-white"}`}
+          >
+            Paid · Exclusive
+          </button>
+          <button
+            type="button"
+            onClick={() => setFree(true)}
+            className={`py-2 rounded-xl text-sm font-semibold transition-colors ${f.isFree ? "bg-[#1DB954] text-black" : "text-muted-foreground hover:text-white"}`}
+          >
+            Free download
+          </button>
+        </div>
+        <p className="text-[11px] text-muted-foreground -mt-2">
+          {f.isFree
+            ? "Free: musicians download your uploaded MP3 directly — upload a tagged version."
+            : "Paid: musicians order it, you confirm payment and deliver the private file. Sold once (exclusive)."}
+        </p>
+
         <input className={inputCls} placeholder="Title" value={f.title} onChange={(e) => up("title", e.target.value)} />
         <div className="grid grid-cols-2 gap-3">
           <input className={inputCls} placeholder="Genre" value={f.genre} onChange={(e) => up("genre", e.target.value)} />
           <input className={inputCls} placeholder="BPM" value={f.bpm} onChange={(e) => up("bpm", e.target.value)} />
           <input className={inputCls} placeholder="Mood" value={f.mood} onChange={(e) => up("mood", e.target.value)} />
-          <input className={inputCls} placeholder="Price (₦)" value={f.price} onChange={(e) => up("price", e.target.value)} />
+          {!f.isFree && (
+            <input className={inputCls} placeholder="Price (₦)" value={f.price} onChange={(e) => up("price", e.target.value)} />
+          )}
           <input className={inputCls} placeholder="Key (e.g. C min)" value={f.key} onChange={(e) => up("key", e.target.value)} />
           <input className={inputCls} placeholder="Duration (e.g. 2:45)" value={f.duration} onChange={(e) => up("duration", e.target.value)} />
         </div>
@@ -927,14 +957,22 @@ function BeatModal({ initial, onClose, onSaved }: { initial: Beat | null; onClos
           onChange={(e) => up("notes", e.target.value)}
         />
         <FileField label="Cover art" kind="image" folder="beats/covers" value={f.image} onUploaded={(url) => up("image", url)} />
-        <FileField label="Preview audio (MP3)" kind="mp3" folder="beats/audio" value={f.audioUrl} onUploaded={(url) => up("audioUrl", url)} />
         <FileField
-          label="Deliverable — sent to buyer after purchase"
-          kind="deliverable"
-          value={f.deliverablePath}
-          onUploaded={(path) => up("deliverablePath", path)}
-          hint="Private. Full MP3/WAV or a .zip of stems (max 50 MB)."
+          label={f.isFree ? "Beat MP3 (this is the free download — tag it!)" : "Preview audio (MP3)"}
+          kind="mp3"
+          folder="beats/audio"
+          value={f.audioUrl}
+          onUploaded={(url) => up("audioUrl", url)}
         />
+        {!f.isFree && (
+          <FileField
+            label="Deliverable — sent to buyer after purchase"
+            kind="deliverable"
+            value={f.deliverablePath}
+            onUploaded={(path) => up("deliverablePath", path)}
+            hint="Private. Full MP3/WAV or a .zip of stems (max 50 MB)."
+          />
+        )}
         {err && <p className="text-sm text-red-400">{err}</p>}
         <button onClick={save} disabled={pending} className="w-full py-3 rounded-full bg-[#1DB954] text-black font-semibold hover:bg-[#1ed760] transition-colors disabled:opacity-60">
           {pending ? "Saving…" : "Save Beat"}

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Search, Play, Pause, Heart, Music, SlidersHorizontal } from "lucide-react";
 import type { Beat } from "@/lib/types";
 import { genres as baseGenres } from "@/lib/constants";
-import { formatNaira } from "@/lib/format";
+import { priceLabel } from "@/lib/format";
 import { usePlayer } from "@/lib/player";
 
 export default function StoreView({ beats, initialSearch = "" }: { beats: Beat[]; initialSearch?: string }) {
@@ -149,9 +149,11 @@ export default function StoreView({ beats, initialSearch = "" }: { beats: Beat[]
               <div className="relative aspect-square">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={beat.image} alt={beat.title} className={`w-full h-full object-cover ${beat.sold ? "opacity-60" : ""}`} />
-                {beat.sold && (
+                {beat.isFree ? (
+                  <div className="absolute top-2 right-2 bg-[#1DB954] text-black text-[10px] font-bold px-2 py-0.5 rounded-full">Free</div>
+                ) : beat.sold ? (
                   <div className="absolute top-2 right-2 bg-black/80 text-[10px] text-red-400 font-semibold px-2 py-0.5 rounded-full">Sold</div>
-                )}
+                ) : null}
                 <div className={`absolute inset-0 bg-black/40 flex items-center justify-center transition-opacity ${isPlaying ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
                   <button
                     onClick={(e) => onPlay(e, beat)}
@@ -168,7 +170,7 @@ export default function StoreView({ beats, initialSearch = "" }: { beats: Beat[]
                   {beat.genre} · {beat.bpm} BPM{beat.key ? ` · ${beat.key}` : ""}
                 </p>
                 <div className="flex items-center justify-between mt-3">
-                  <span className="text-sm font-bold text-[#1DB954]">{formatNaira(beat.price)}</span>
+                  <span className="text-sm font-bold text-[#1DB954]">{priceLabel(beat)}</span>
                   <div className="flex items-center gap-2">
                     <button
                       onClick={(e) => {
