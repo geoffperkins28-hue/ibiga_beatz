@@ -218,6 +218,8 @@ export interface BeatInput {
   duration: string;
   image: string;
   audioUrl: string;
+  key: string;
+  notes: string;
 }
 
 export async function createBeat(input: BeatInput): Promise<ActionResult> {
@@ -226,7 +228,7 @@ export async function createBeat(input: BeatInput): Promise<ActionResult> {
   const sb = getSupabaseServer();
   if (!sb) return { ok: true, demo: true };
 
-  const { error } = await sb.from("beats").insert({
+  const row = {
     title: input.title,
     genre: input.genre || "Afrobeats",
     bpm: input.bpm ? Number(input.bpm) : 0,
@@ -235,12 +237,42 @@ export async function createBeat(input: BeatInput): Promise<ActionResult> {
     duration: input.duration || null,
     image: input.image || null,
     audio_url: input.audioUrl || null,
+    key: input.key || null,
+    notes: input.notes || null,
     plays: 0,
-  });
+  };
+  const { error } = await insertWithNewColsFallback(sb, row);
   if (error) return { ok: false, error: error.message };
   revalidatePath("/", "layout");
   return { ok: true };
 }
+
+/** True when a write failed only because migration 0004 (key/notes) isn't applied yet. */
+function isMissingNewCols(msg?: string): boolean {
+  return Boolean(msg && /schema cache|column/i.test(msg) && /\bkey\b|\bnotes\b/i.test(msg));
+}
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+async function insertWithNewColsFallback(sb: any, row: any) {
+  const res = await sb.from("beats").insert(row);
+  if (res.error && isMissingNewCols(res.error.message)) {
+    const { key, notes, ...rest } = row;
+    void key; void notes;
+    return sb.from("beats").insert(rest);
+  }
+  return res;
+}
+
+async function updateWithNewColsFallback(sb: any, id: string, row: any) {
+  const res = await sb.from("beats").update(row).eq("id", id);
+  if (res.error && isMissingNewCols(res.error.message)) {
+    const { key, notes, ...rest } = row;
+    void key; void notes;
+    return sb.from("beats").update(rest).eq("id", id);
+  }
+  return res;
+}
+/* eslint-enable @typescript-eslint/no-explicit-any */
 
 export async function updateBeat(id: string, input: BeatInput): Promise<ActionResult> {
   if (!(await isAuthed())) return { ok: false, error: "Not authorized." };
@@ -248,19 +280,18 @@ export async function updateBeat(id: string, input: BeatInput): Promise<ActionRe
   const sb = getSupabaseServer();
   if (!sb) return { ok: true, demo: true };
 
-  const { error } = await sb
-    .from("beats")
-    .update({
-      title: input.title,
-      genre: input.genre || "Afrobeats",
-      bpm: input.bpm ? Number(input.bpm) : 0,
-      mood: input.mood || null,
-      price: input.price ? Number(input.price) : 0,
-      duration: input.duration || null,
-      image: input.image || null,
-      audio_url: input.audioUrl || null,
-    })
-    .eq("id", id);
+  const { error } = await updateWithNewColsFallback(sb, id, {
+    title: input.title,
+    genre: input.genre || "Afrobeats",
+    bpm: input.bpm ? Number(input.bpm) : 0,
+    mood: input.mood || null,
+    price: input.price ? Number(input.price) : 0,
+    duration: input.duration || null,
+    image: input.image || null,
+    audio_url: input.audioUrl || null,
+    key: input.key || null,
+    notes: input.notes || null,
+  });
   if (error) return { ok: false, error: error.message };
   revalidatePath("/", "layout");
   return { ok: true };

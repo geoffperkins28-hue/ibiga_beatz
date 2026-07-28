@@ -778,8 +778,10 @@ function BeatModal({ initial, onClose, onSaved }: { initial: Beat | null; onClos
           duration: initial.duration ?? "",
           image: initial.image ?? "",
           audioUrl: initial.audioUrl ?? "",
+          key: initial.key ?? "",
+          notes: initial.notes ?? "",
         }
-      : { title: "", genre: "Afrobeats", bpm: "", mood: "", price: "", duration: "", image: "", audioUrl: "" }
+      : { title: "", genre: "Afrobeats", bpm: "", mood: "", price: "", duration: "", image: "", audioUrl: "", key: "", notes: "" }
   );
   const [err, setErr] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -806,8 +808,16 @@ function BeatModal({ initial, onClose, onSaved }: { initial: Beat | null; onClos
           <input className={inputCls} placeholder="BPM" value={f.bpm} onChange={(e) => up("bpm", e.target.value)} />
           <input className={inputCls} placeholder="Mood" value={f.mood} onChange={(e) => up("mood", e.target.value)} />
           <input className={inputCls} placeholder="Price (₦)" value={f.price} onChange={(e) => up("price", e.target.value)} />
+          <input className={inputCls} placeholder="Key (e.g. C min)" value={f.key} onChange={(e) => up("key", e.target.value)} />
+          <input className={inputCls} placeholder="Duration (e.g. 2:45)" value={f.duration} onChange={(e) => up("duration", e.target.value)} />
         </div>
-        <input className={inputCls} placeholder="Duration (e.g. 2:45)" value={f.duration} onChange={(e) => up("duration", e.target.value)} />
+        <textarea
+          className={`${inputCls} resize-none`}
+          rows={3}
+          placeholder="Producer notes (what's included, vibe, usage…)"
+          value={f.notes}
+          onChange={(e) => up("notes", e.target.value)}
+        />
         <FileField label="Cover art" kind="image" folder="beats/covers" value={f.image} onUploaded={(url) => up("image", url)} />
         <FileField label="Beat audio (MP3)" kind="mp3" folder="beats/audio" value={f.audioUrl} onUploaded={(url) => up("audioUrl", url)} />
         {err && <p className="text-sm text-red-400">{err}</p>}

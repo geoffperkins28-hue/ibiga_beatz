@@ -35,6 +35,8 @@ function rowToBeat(r: any): Beat {
     image: r.image ?? "",
     audioUrl: r.audio_url ?? null,
     sold: r.sold ?? false,
+    key: r.key ?? "",
+    notes: r.notes ?? "",
   };
 }
 
@@ -146,6 +148,23 @@ export async function getBeats(): Promise<Beat[]> {
     .order("created_at", { ascending: false });
   if (error || !data) return mockBeats;
   return data.map(rowToBeat);
+}
+
+/** A single beat by id — for the beat detail page. Falls back to mock in dev. */
+export async function getBeatById(id: string): Promise<Beat | null> {
+  const sb = getSupabaseServer();
+  if (!sb) return mockBeats.find((b) => b.id === id) ?? null;
+  const { data, error } = await sb.from("beats").select("*").eq("id", id).maybeSingle();
+  if (error || !data) return null;
+  return rowToBeat(data);
+}
+
+/** Up to `limit` other beats in the same genre (for "related beats"). */
+export async function getRelatedBeats(beat: Beat, limit = 4): Promise<Beat[]> {
+  const all = await getBeats();
+  const sameGenre = all.filter((b) => b.id !== beat.id && b.genre === beat.genre);
+  const pool = sameGenre.length ? sameGenre : all.filter((b) => b.id !== beat.id);
+  return pool.slice(0, limit);
 }
 
 export async function getSongs(): Promise<Song[]> {

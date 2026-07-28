@@ -20,6 +20,8 @@ export interface Beat {
   image: string;
   audioUrl?: string | null;
   sold?: boolean;
+  key?: string;
+  notes?: string;
 }
 
 export type Platform = "spotify" | "youtube" | "apple";

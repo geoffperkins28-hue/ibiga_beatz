@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Play, Pause } from "lucide-react";
 import type { Beat } from "@/lib/types";
 import { formatNaira } from "@/lib/format";
@@ -10,15 +11,17 @@ export default function BeatCard({ beat, queue }: { beat: Beat; queue?: Beat[] }
   const isCurrent = current?.id === beat.id;
   const isPlaying = isCurrent && playing;
 
-  const onPlay = () => {
+  const onPlay = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     if (isCurrent) toggle();
     else play(beat, queue);
   };
 
   return (
-    <div
-      className="bg-card rounded-2xl overflow-hidden border border-border hover:bg-[#282828] transition-all duration-200 group cursor-pointer"
-      onClick={onPlay}
+    <Link
+      href={`/store/${beat.id}`}
+      className="block bg-card rounded-2xl overflow-hidden border border-border hover:bg-[#282828] transition-all duration-200 group"
     >
       <div className="relative aspect-square">
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -29,10 +32,7 @@ export default function BeatCard({ beat, queue }: { beat: Beat; queue?: Beat[] }
           }`}
         >
           <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onPlay();
-            }}
+            onClick={onPlay}
             className="w-12 h-12 rounded-full bg-[#1DB954] flex items-center justify-center hover:scale-105 transition-transform shadow-lg"
             aria-label={isPlaying ? "Pause" : "Play"}
           >
@@ -55,6 +55,6 @@ export default function BeatCard({ beat, queue }: { beat: Beat; queue?: Beat[] }
           <span className="text-[10px] text-muted-foreground">{beat.plays.toLocaleString()} plays</span>
         </div>
       </div>
-    </div>
+    </Link>
   );
 }
