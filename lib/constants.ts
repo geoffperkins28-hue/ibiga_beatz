@@ -34,6 +34,7 @@ export const statusColors: Record<string, string> = {
   Completed: "bg-[#1DB954]/20 text-[#1DB954]",
   Pending: "bg-yellow-500/20 text-yellow-400",
   Confirmed: "bg-[#1DB954]/20 text-[#1DB954]",
+  Fulfilled: "bg-[#1DB954]/20 text-[#1DB954]",
   Cancelled: "bg-red-500/20 text-red-400",
   Rejected: "bg-red-500/20 text-red-400",
 };

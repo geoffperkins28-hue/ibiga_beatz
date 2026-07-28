@@ -1,9 +1,10 @@
 "use client";
 
 import { getBrowserSupabase } from "./supabase/browser";
-import { createSignedUpload, createVoiceUpload } from "./actions";
+import { createSignedUpload, createVoiceUpload, createDeliverableUpload } from "./actions";
 
 const MEDIA_BUCKET = "media";
+const DELIVERABLES_BUCKET = "deliverables";
 
 export interface UploadOptions {
   /** "image" ≤5MB; "mp3" beat audio only ≤30MB */
@@ -68,6 +69,34 @@ export async function uploadFile(
   if (error) throw new Error(error.message);
 
   return signed.publicUrl;
+}
+
+/**
+ * Uploads a purchasable deliverable (full MP3/WAV/stems) to the PRIVATE
+ * `deliverables` bucket. Returns the storage PATH (not a URL) to save on the
+ * beat — buyers only ever receive short-lived signed URLs at fulfilment time.
+ */
+export async function uploadDeliverable(file: File): Promise<string> {
+  const okType =
+    file.type.startsWith("audio/") ||
+    /\.(mp3|wav|aiff?|zip)$/i.test(file.name);
+  if (!okType) throw new Error("Choose an audio file (MP3/WAV) or a .zip of stems.");
+  if (file.size > 50 * 1024 * 1024) throw new Error("File is too large (max 50 MB).");
+
+  const signed = await createDeliverableUpload(file.name);
+  if (signed.error || !signed.path || !signed.token) {
+    throw new Error(signed.error ?? "Could not start the upload.");
+  }
+
+  const supabase = getBrowserSupabase();
+  if (!supabase) throw new Error("Storage isn't available.");
+
+  const { error } = await supabase.storage
+    .from(DELIVERABLES_BUCKET)
+    .uploadToSignedUrl(signed.path, signed.token, file, { contentType: file.type || "application/octet-stream" });
+  if (error) throw new Error(error.message);
+
+  return signed.path;
 }
 
 /**

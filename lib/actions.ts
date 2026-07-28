@@ -10,10 +10,14 @@ import {
   bookingEmail,
   customerRequestEmail,
   customerBookingEmail,
+  orderEmail,
+  customerOrderEmail,
+  orderFulfilledEmail,
 } from "./notify";
 import type { ProducerProfile } from "./types";
 
 const MEDIA_BUCKET = "media";
+const DELIVERABLES_BUCKET = "deliverables";
 
 /** Returns true when an authenticated producer is making the request. */
 async function isAuthed(): Promise<boolean> {
@@ -207,6 +211,28 @@ export async function createVoiceUpload(
   return { path: data.path, token: data.token, publicUrl: pub.publicUrl };
 }
 
+/**
+ * Auth-guarded signed upload into the PRIVATE `deliverables` bucket — the clean
+ * file a buyer receives after purchase. Returns only the storage path (no public
+ * URL); downloads are always short-lived signed URLs minted at fulfilment time.
+ */
+export async function createDeliverableUpload(
+  filename: string
+): Promise<SignedUploadResult> {
+  if (!(await isAuthed())) return { error: "Not authorized." };
+  const sb = getSupabaseServer();
+  if (!sb) return { error: "Storage isn't configured yet." };
+
+  const ext = (filename.split(".").pop() || "bin").replace(/[^a-z0-9]/gi, "").toLowerCase();
+  const path = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+
+  const { data, error } = await sb.storage
+    .from(DELIVERABLES_BUCKET)
+    .createSignedUploadUrl(path);
+  if (error || !data) return { error: error?.message ?? "Could not start upload." };
+  return { path: data.path, token: data.token };
+}
+
 // ── Beats management ─────────────────────────────────────────────────────────
 
 export interface BeatInput {
@@ -220,6 +246,7 @@ export interface BeatInput {
   audioUrl: string;
   key: string;
   notes: string;
+  deliverablePath: string;
 }
 
 export async function createBeat(input: BeatInput): Promise<ActionResult> {
@@ -239,6 +266,7 @@ export async function createBeat(input: BeatInput): Promise<ActionResult> {
     audio_url: input.audioUrl || null,
     key: input.key || null,
     notes: input.notes || null,
+    deliverable_path: input.deliverablePath || null,
     plays: 0,
   };
   const { error } = await insertWithNewColsFallback(sb, row);
@@ -247,18 +275,22 @@ export async function createBeat(input: BeatInput): Promise<ActionResult> {
   return { ok: true };
 }
 
-/** True when a write failed only because migration 0004 (key/notes) isn't applied yet. */
+/** True when a write failed only because a newer migration (0004/0005) isn't applied yet. */
 function isMissingNewCols(msg?: string): boolean {
-  return Boolean(msg && /schema cache|column/i.test(msg) && /\bkey\b|\bnotes\b/i.test(msg));
+  return Boolean(msg && /schema cache|column/i.test(msg) && /\bkey\b|\bnotes\b|deliverable_path/i.test(msg));
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
+function stripNewCols(row: any) {
+  const { key, notes, deliverable_path, ...rest } = row;
+  void key; void notes; void deliverable_path;
+  return rest;
+}
+
 async function insertWithNewColsFallback(sb: any, row: any) {
   const res = await sb.from("beats").insert(row);
   if (res.error && isMissingNewCols(res.error.message)) {
-    const { key, notes, ...rest } = row;
-    void key; void notes;
-    return sb.from("beats").insert(rest);
+    return sb.from("beats").insert(stripNewCols(row));
   }
   return res;
 }
@@ -266,9 +298,7 @@ async function insertWithNewColsFallback(sb: any, row: any) {
 async function updateWithNewColsFallback(sb: any, id: string, row: any) {
   const res = await sb.from("beats").update(row).eq("id", id);
   if (res.error && isMissingNewCols(res.error.message)) {
-    const { key, notes, ...rest } = row;
-    void key; void notes;
-    return sb.from("beats").update(rest).eq("id", id);
+    return sb.from("beats").update(stripNewCols(row)).eq("id", id);
   }
   return res;
 }
@@ -291,6 +321,7 @@ export async function updateBeat(id: string, input: BeatInput): Promise<ActionRe
     audio_url: input.audioUrl || null,
     key: input.key || null,
     notes: input.notes || null,
+    deliverable_path: input.deliverablePath || null,
   });
   if (error) return { ok: false, error: error.message };
   revalidatePath("/", "layout");
@@ -498,5 +529,119 @@ export async function submitBooking(
       customerBookingEmail({ name: input.name, service: input.service, date: input.date })
     ),
   ]);
+  return { ok: true };
+}
+
+// ── Orders & digital delivery ────────────────────────────────────────────────
+
+/** How long a delivered download link stays valid (7 days). */
+const DOWNLOAD_TTL_SECONDS = 60 * 60 * 24 * 7;
+
+export interface OrderInput {
+  beatId: string;
+  beatTitle: string;
+  amount: number;
+  name: string;
+  email: string;
+  phone: string;
+  note: string;
+}
+
+/** Public: a buyer reserves/purchases a beat. Producer fulfils it from the dashboard. */
+export async function submitOrder(
+  input: OrderInput,
+  guard?: AntiSpam
+): Promise<ActionResult> {
+  if (looksLikeBot(guard)) return { ok: true };
+  if (!input.email.trim() || !input.email.includes("@")) {
+    return { ok: false, error: "A valid email is required." };
+  }
+
+  const sb = getSupabaseServer();
+  if (!sb) return { ok: true, demo: true };
+
+  const { error } = await sb.from("orders").insert({
+    beat_id: input.beatId || null,
+    beat_title: input.beatTitle || null,
+    amount: input.amount || 0,
+    customer_name: input.name || null,
+    customer_email: input.email,
+    customer_phone: input.phone || null,
+    note: input.note || null,
+    status: "Pending",
+  });
+  if (error) {
+    // Orders table not created yet (migration 0005) — fail soft with a clear message.
+    if (/relation|does not exist|schema cache/i.test(error.message)) {
+      return { ok: false, error: "Ordering isn't available just yet — please contact the producer to buy this beat." };
+    }
+    return { ok: false, error: error.message };
+  }
+
+  await Promise.all([
+    notifyProducer(
+      `New order — ${input.beatTitle}`,
+      orderEmail({ beatTitle: input.beatTitle, amount: input.amount, name: input.name, email: input.email, phone: input.phone, note: input.note })
+    ),
+    notifyCustomer(
+      input.email,
+      `We received your order — ${input.beatTitle}`,
+      customerOrderEmail({ name: input.name, beatTitle: input.beatTitle, amount: input.amount })
+    ),
+  ]);
+  return { ok: true };
+}
+
+/**
+ * Producer action: fulfil an order. Mints a 7-day signed download link for the
+ * beat's deliverable (if uploaded), emails it to the buyer, marks the order
+ * Fulfilled and — exclusive model — marks the beat sold.
+ */
+export async function fulfilOrder(id: string): Promise<ActionResult> {
+  if (!(await isAuthed())) return { ok: false, error: "Not authorized." };
+  const sb = getSupabaseServer();
+  if (!sb) return { ok: true, demo: true };
+
+  const { data: order, error: e1 } = await sb.from("orders").select("*").eq("id", id).maybeSingle();
+  if (e1 || !order) return { ok: false, error: e1?.message ?? "Order not found." };
+
+  let downloadUrl: string | null = null;
+  if (order.beat_id) {
+    const { data: beat } = await sb.from("beats").select("deliverable_path").eq("id", order.beat_id).maybeSingle();
+    const path = beat?.deliverable_path as string | undefined;
+    if (path) {
+      const { data: signed } = await sb.storage.from(DELIVERABLES_BUCKET).createSignedUrl(path, DOWNLOAD_TTL_SECONDS);
+      downloadUrl = signed?.signedUrl ?? null;
+    }
+    // Exclusive rule: once sold, take it off the store.
+    await sb.from("beats").update({ sold: true }).eq("id", order.beat_id);
+  }
+
+  const { error: e2 } = await sb
+    .from("orders")
+    .update({ status: "Fulfilled", fulfilled_at: new Date().toISOString() })
+    .eq("id", id);
+  if (e2) return { ok: false, error: e2.message };
+
+  await notifyCustomer(
+    order.customer_email,
+    `Your beat is ready — ${order.beat_title ?? "Ibiga Beatz"}`,
+    orderFulfilledEmail({ name: order.customer_name ?? "", beatTitle: order.beat_title ?? "", downloadUrl })
+  );
+
+  revalidatePath("/", "layout");
+  // Surface a soft warning if there was nothing to deliver.
+  return downloadUrl || !order.beat_id
+    ? { ok: true }
+    : { ok: true, error: "Fulfilled, but this beat has no deliverable file — upload one, then re-fulfil to send the download link." };
+}
+
+export async function cancelOrder(id: string): Promise<ActionResult> {
+  if (!(await isAuthed())) return { ok: false, error: "Not authorized." };
+  const sb = getSupabaseServer();
+  if (!sb) return { ok: true, demo: true };
+  const { error } = await sb.from("orders").update({ status: "Cancelled" }).eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/", "layout");
   return { ok: true };
 }

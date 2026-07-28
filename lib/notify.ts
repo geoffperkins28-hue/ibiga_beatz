@@ -90,3 +90,42 @@ export function customerBookingEmail(b: { name: string; service: string; date: s
     <p>— Ibiga Beatz</p>
   `;
 }
+
+// ── Orders ───────────────────────────────────────────────────────────────────
+
+function naira(n: number): string {
+  return `₦${Math.round(Number.isFinite(n) ? n : 0).toLocaleString("en-NG")}`;
+}
+
+export function orderEmail(o: { beatTitle: string; amount: number; name: string; email: string; phone: string; note: string }): string {
+  return `
+    <h2>New beat order 🛒</h2>
+    <p><strong>${esc(o.beatTitle)}</strong> — ${naira(o.amount)}</p>
+    <p>${esc(o.name)} &lt;${esc(o.email)}&gt;${o.phone ? ` · ${esc(o.phone)}` : ""}</p>
+    ${o.note ? `<p>Note: ${esc(o.note)}</p>` : ""}
+    <p>Open your dashboard → Orders to confirm payment and deliver the files.</p>
+  `;
+}
+
+export function customerOrderEmail(o: { name: string; beatTitle: string; amount: number }): string {
+  return `
+    <h2>We got your order 🎧</h2>
+    <p>Hi ${esc(o.name || "there")}, thanks for ordering <strong>${esc(o.beatTitle)}</strong> (${naira(o.amount)}).</p>
+    <p>Ibiga will confirm payment and send your files shortly. You'll get a follow-up email with your download link.</p>
+    <p>— Ibiga Beatz</p>
+  `;
+}
+
+export function orderFulfilledEmail(o: { name: string; beatTitle: string; downloadUrl: string | null }): string {
+  return `
+    <h2>Your beat is ready 🔥</h2>
+    <p>Hi ${esc(o.name || "there")}, <strong>${esc(o.beatTitle)}</strong> is all yours.</p>
+    ${
+      o.downloadUrl
+        ? `<p><a href="${esc(o.downloadUrl)}" style="display:inline-block;background:#1DB954;color:#000;font-weight:600;padding:12px 20px;border-radius:9999px;text-decoration:none">Download your files</a></p>
+           <p style="color:#666;font-size:12px">This link expires in 7 days — save your files somewhere safe.</p>`
+        : `<p>Ibiga will send your files directly. Reply to this email if you don't hear back soon.</p>`
+    }
+    <p>— Ibiga Beatz</p>
+  `;
+}

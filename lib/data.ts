@@ -15,6 +15,7 @@ import type {
   Client,
   CustomRequest,
   Booking,
+  Order,
   ProducerProfile,
 } from "./types";
 
@@ -37,6 +38,7 @@ function rowToBeat(r: any): Beat {
     sold: r.sold ?? false,
     key: r.key ?? "",
     notes: r.notes ?? "",
+    deliverablePath: r.deliverable_path ?? "",
   };
 }
 
@@ -83,6 +85,22 @@ function rowToBooking(r: any): Booking {
     time: r.time ?? "",
     notes: r.notes ?? "",
     status: r.status ?? "Pending",
+  };
+}
+
+function rowToOrder(r: any): Order {
+  return {
+    id: String(r.id),
+    beatId: r.beat_id ? String(r.beat_id) : "",
+    beatTitle: r.beat_title ?? "",
+    amount: Number(r.amount ?? 0),
+    name: r.customer_name ?? "",
+    email: r.customer_email ?? "",
+    phone: r.customer_phone ?? "",
+    note: r.note ?? "",
+    status: r.status ?? "Pending",
+    date: formatDate(r.created_at),
+    hasDeliverable: Boolean(r.beats?.deliverable_path),
   };
 }
 
@@ -228,6 +246,18 @@ export async function getRequests(): Promise<CustomRequest[]> {
     .order("created_at", { ascending: false });
   if (error || !data) return [];
   return data.map(rowToRequest);
+}
+
+export async function getOrders(): Promise<Order[]> {
+  const sb = getSupabaseServer();
+  if (!sb) return [];
+  // Join the beat so we know whether a deliverable file still exists to hand over.
+  const { data, error } = await sb
+    .from("orders")
+    .select("*, beats(deliverable_path)")
+    .order("created_at", { ascending: false });
+  if (error || !data) return [];
+  return data.map(rowToOrder);
 }
 
 export async function getBookings(): Promise<Booking[]> {

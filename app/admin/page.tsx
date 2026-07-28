@@ -7,6 +7,7 @@ import {
   getClients,
   getRequests,
   getBookings,
+  getOrders,
   getProfile,
 } from "@/lib/data";
 
@@ -15,7 +16,7 @@ export const dynamic = "force-dynamic";
 
 export default async function AdminPage() {
   await requireUser();
-  const [beats, songs, stats, clients, requests, bookings, profile] =
+  const [beats, songs, stats, clients, requests, bookings, orders, profile] =
     await Promise.all([
       getBeats(),
       getSongs(),
@@ -23,6 +24,7 @@ export default async function AdminPage() {
       getClients(),
       getRequests(),
       getBookings(),
+      getOrders(),
       getProfile(),
     ]);
 
@@ -35,6 +37,7 @@ export default async function AdminPage() {
       clients={clients}
       requests={requests}
       bookings={bookings}
+      orders={orders}
     />
   );
 }

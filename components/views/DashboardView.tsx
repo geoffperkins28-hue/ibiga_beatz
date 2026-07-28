@@ -23,6 +23,8 @@ import {
   Star,
   ChevronUp,
   ChevronDown,
+  Lock,
+  Download,
 } from "lucide-react";
 import type {
   Beat,
@@ -31,6 +33,7 @@ import type {
   Client,
   CustomRequest,
   Booking,
+  Order,
   ProducerProfile,
 } from "@/lib/types";
 import { statusColors } from "@/lib/constants";
@@ -49,10 +52,12 @@ import {
   updateRequestStatus,
   updateBookingStatus,
   updateBooking,
+  fulfilOrder,
+  cancelOrder,
   type BeatInput,
   type SongInput,
 } from "@/lib/actions";
-import { uploadFile } from "@/lib/upload-client";
+import { uploadFile, uploadDeliverable } from "@/lib/upload-client";
 
 const REQUEST_STATUSES = ["New", "Under Review", "Accepted", "In Progress", "Completed", "Rejected"];
 const BOOKING_STATUSES = ["Pending", "Confirmed", "Completed", "Cancelled"];
@@ -65,8 +70,8 @@ const statIcons: Record<string, React.ElementType> = {
   Music,
 };
 
-type Tab = "overview" | "beats" | "productions" | "requests" | "bookings" | "clients";
-const tabs: Tab[] = ["overview", "beats", "productions", "requests", "bookings", "clients"];
+type Tab = "overview" | "beats" | "orders" | "productions" | "requests" | "bookings" | "clients";
+const tabs: Tab[] = ["overview", "beats", "orders", "productions", "requests", "bookings", "clients"];
 
 const inputCls =
   "w-full bg-[#282828] border border-border rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[#1DB954]/40";
@@ -106,6 +111,7 @@ export default function DashboardView({
   clients,
   requests,
   bookings,
+  orders,
 }: {
   profile: ProducerProfile;
   beats: Beat[];
@@ -114,6 +120,7 @@ export default function DashboardView({
   clients: Client[];
   requests: CustomRequest[];
   bookings: Booking[];
+  orders: Order[];
 }) {
   const [activeTab, setActiveTab] = useState<Tab>("overview");
   const router = useRouter();
@@ -131,8 +138,9 @@ export default function DashboardView({
 
   const newRequests = requests.filter((r) => r.status === "New").length;
   const pendingBookings = bookings.filter((b) => b.status === "Pending").length;
-  const totalAlerts = newRequests + pendingBookings;
-  const tabCount: Partial<Record<Tab, number>> = { requests: newRequests, bookings: pendingBookings };
+  const pendingOrders = orders.filter((o) => o.status === "Pending").length;
+  const totalAlerts = newRequests + pendingBookings + pendingOrders;
+  const tabCount: Partial<Record<Tab, number>> = { requests: newRequests, bookings: pendingBookings, orders: pendingOrders };
 
   const refresh = () => router.refresh();
 
@@ -203,8 +211,36 @@ export default function DashboardView({
     });
   };
 
-  // Actionable alerts feed for the bell dropdown — new requests + pending bookings.
+  const fulfil = (id: string, title: string, hasDeliverable: boolean) => {
+    const msg = hasDeliverable
+      ? `Deliver "${title}"? This emails the buyer their download link and marks the beat sold.`
+      : `"${title}" has no deliverable file uploaded. Fulfil anyway? The buyer will be told files are coming.`;
+    if (!confirm(msg)) return;
+    setError(null);
+    startTransition(async () => {
+      const res = await fulfilOrder(id);
+      if (res.ok) {
+        if (res.error) setError(res.error); // soft warning (e.g. no deliverable)
+        refresh();
+      } else setError(res.error ?? "Failed to fulfil.");
+    });
+  };
+
+  const voidOrder = (id: string, title: string) => {
+    if (!confirm(`Cancel the order for "${title}"?`)) return;
+    setError(null);
+    startTransition(async () => {
+      const res = await cancelOrder(id);
+      if (res.ok) refresh();
+      else setError(res.error ?? "Failed to cancel.");
+    });
+  };
+
+  // Actionable alerts feed for the bell dropdown — pending orders, new requests, pending bookings.
   const notifications = [
+    ...orders
+      .filter((o) => o.status === "Pending")
+      .map((o) => ({ key: `o-${o.id}`, title: `New order — ${o.beatTitle}`, sub: [o.name, o.date].filter(Boolean).join(" · "), tab: "orders" as Tab })),
     ...requests
       .filter((r) => r.status === "New")
       .map((r) => ({ key: `r-${r.id}`, title: `New request — ${r.name}`, sub: [r.genre, r.date].filter(Boolean).join(" · "), tab: "requests" as Tab })),
@@ -410,6 +446,15 @@ export default function DashboardView({
         </div>
       )}
 
+      {activeTab === "orders" && (
+        <div className="space-y-3">
+          {orders.map((o) => (
+            <OrderRow key={o.id} o={o} pending={pending} onFulfil={fulfil} onCancel={voidOrder} />
+          ))}
+          {orders.length === 0 && <p className="text-sm text-muted-foreground py-8 text-center">No orders yet — they’ll appear here when a buyer places one.</p>}
+        </div>
+      )}
+
       {activeTab === "productions" && (
         <div className="space-y-4">
           <div className="flex justify-between items-center">
@@ -568,6 +613,58 @@ export default function DashboardView({
   );
 }
 
+function OrderRow({
+  o,
+  pending,
+  onFulfil,
+  onCancel,
+}: {
+  o: Order;
+  pending: boolean;
+  onFulfil: (id: string, title: string, hasDeliverable: boolean) => void;
+  onCancel: (id: string, title: string) => void;
+}) {
+  return (
+    <div className="bg-card border border-border rounded-2xl p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="font-semibold text-white truncate">{o.beatTitle || "Beat"}</p>
+            <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full shrink-0 ${statusColors[o.status] ?? "bg-[#282828] text-white"}`}>{o.status}</span>
+            {o.status === "Pending" && !o.hasDeliverable && (
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-400 shrink-0">no file</span>
+            )}
+          </div>
+          <p className="text-sm font-bold text-[#1DB954] mt-1">{formatNaira(o.amount)}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {o.name ? `${o.name} · ` : ""}<span className="text-white">{o.email}</span>{o.phone ? ` · ${o.phone}` : ""}
+          </p>
+          <p className="text-xs text-muted-foreground mt-0.5">{o.date}</p>
+          {o.note && <p className="text-xs text-muted-foreground mt-1.5 whitespace-pre-line">“{o.note}”</p>}
+        </div>
+      </div>
+      {o.status === "Pending" && (
+        <div className="flex gap-2 mt-4">
+          <button
+            onClick={() => onFulfil(o.id, o.beatTitle || "Beat", o.hasDeliverable)}
+            disabled={pending}
+            className="px-4 py-2 rounded-full bg-[#1DB954] text-black text-xs font-semibold flex items-center gap-2 hover:bg-[#1ed760] transition-colors disabled:opacity-60"
+          >
+            <Download size={13} /> Deliver &amp; mark sold
+          </button>
+          <button
+            onClick={() => onCancel(o.id, o.beatTitle || "Beat")}
+            disabled={pending}
+            className="px-4 py-2 rounded-full bg-[#282828] text-muted-foreground text-xs font-medium hover:text-white transition-colors disabled:opacity-60"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function RequestRow({
   r,
   pending,
@@ -693,12 +790,14 @@ function FileField({
   folder,
   value,
   onUploaded,
+  hint,
 }: {
   label: string;
-  kind: "image" | "mp3";
-  folder: string;
+  kind: "image" | "mp3" | "deliverable";
+  folder?: string;
   value: string;
   onUploaded: (url: string) => void;
+  hint?: string;
 }) {
   const ref = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -710,14 +809,19 @@ function FileField({
     setName(file.name);
     setUploading(true);
     try {
-      const url = await uploadFile(file, folder, { kind });
-      onUploaded(url);
+      const result =
+        kind === "deliverable"
+          ? await uploadDeliverable(file)
+          : await uploadFile(file, folder ?? "misc", { kind });
+      onUploaded(result);
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Upload failed.");
     } finally {
       setUploading(false);
     }
   };
+
+  const readyLabel = kind === "mp3" ? "MP3 ready" : kind === "deliverable" ? "File ready" : "Image ready";
 
   return (
     <div>
@@ -730,6 +834,8 @@ function FileField({
           <div className="w-14 h-14 rounded-xl bg-[#282828] border border-border flex items-center justify-center shrink-0">
             {kind === "image" ? (
               <ImageIcon size={18} className="text-muted-foreground" />
+            ) : kind === "deliverable" ? (
+              <Lock size={18} className={value ? "text-[#1DB954]" : "text-muted-foreground"} />
             ) : (
               <Music size={18} className={value ? "text-[#1DB954]" : "text-muted-foreground"} />
             )}
@@ -746,8 +852,9 @@ function FileField({
             {uploading ? "Uploading…" : value ? "Replace" : "Choose file"}
           </button>
           {value && !uploading && (
-            <p className="text-[11px] text-[#1DB954] mt-1 truncate">{name || (kind === "mp3" ? "MP3 ready" : "Image ready")}</p>
+            <p className="text-[11px] text-[#1DB954] mt-1 truncate">{name || readyLabel}</p>
           )}
+          {hint && !err && <p className="text-[11px] text-muted-foreground mt-1">{hint}</p>}
           {err && <p className="text-xs text-red-400 mt-1">{err}</p>}
         </div>
       </div>
@@ -755,7 +862,7 @@ function FileField({
       <input
         ref={ref}
         type="file"
-        accept={kind === "image" ? "image/*" : "audio/mpeg,.mp3"}
+        accept={kind === "image" ? "image/*" : kind === "deliverable" ? "audio/*,.wav,.zip,.mp3" : "audio/mpeg,.mp3"}
         className="hidden"
         onChange={(e) => {
           const file = e.target.files?.[0];
@@ -780,8 +887,9 @@ function BeatModal({ initial, onClose, onSaved }: { initial: Beat | null; onClos
           audioUrl: initial.audioUrl ?? "",
           key: initial.key ?? "",
           notes: initial.notes ?? "",
+          deliverablePath: initial.deliverablePath ?? "",
         }
-      : { title: "", genre: "Afrobeats", bpm: "", mood: "", price: "", duration: "", image: "", audioUrl: "", key: "", notes: "" }
+      : { title: "", genre: "Afrobeats", bpm: "", mood: "", price: "", duration: "", image: "", audioUrl: "", key: "", notes: "", deliverablePath: "" }
   );
   const [err, setErr] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -819,7 +927,14 @@ function BeatModal({ initial, onClose, onSaved }: { initial: Beat | null; onClos
           onChange={(e) => up("notes", e.target.value)}
         />
         <FileField label="Cover art" kind="image" folder="beats/covers" value={f.image} onUploaded={(url) => up("image", url)} />
-        <FileField label="Beat audio (MP3)" kind="mp3" folder="beats/audio" value={f.audioUrl} onUploaded={(url) => up("audioUrl", url)} />
+        <FileField label="Preview audio (MP3)" kind="mp3" folder="beats/audio" value={f.audioUrl} onUploaded={(url) => up("audioUrl", url)} />
+        <FileField
+          label="Deliverable — sent to buyer after purchase"
+          kind="deliverable"
+          value={f.deliverablePath}
+          onUploaded={(path) => up("deliverablePath", path)}
+          hint="Private. Full MP3/WAV or a .zip of stems (max 50 MB)."
+        />
         {err && <p className="text-sm text-red-400">{err}</p>}
         <button onClick={save} disabled={pending} className="w-full py-3 rounded-full bg-[#1DB954] text-black font-semibold hover:bg-[#1ed760] transition-colors disabled:opacity-60">
           {pending ? "Saving…" : "Save Beat"}

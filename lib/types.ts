@@ -22,6 +22,8 @@ export interface Beat {
   sold?: boolean;
   key?: string;
   notes?: string;
+  /** Path in the private "deliverables" bucket — the file a buyer receives. */
+  deliverablePath?: string;
 }
 
 export type Platform = "spotify" | "youtube" | "apple";
@@ -76,6 +78,23 @@ export interface CustomRequest {
   voiceUrl: string | null;
   status: RequestStatus;
   date: string;
+}
+
+export type OrderStatus = "Pending" | "Fulfilled" | "Cancelled";
+
+export interface Order {
+  id: string;
+  beatId: string;
+  beatTitle: string;
+  amount: number;
+  name: string;
+  email: string;
+  phone: string;
+  note: string;
+  status: OrderStatus;
+  date: string;
+  /** Whether the beat still has a deliverable file to hand over. */
+  hasDeliverable: boolean;
 }
 
 export type BookingStatus = "Pending" | "Confirmed" | "Completed" | "Cancelled";

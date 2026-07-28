@@ -1,10 +1,13 @@
 "use client";
 
+import { useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { ArrowLeft, Play, Pause, Check, ShieldCheck, Lock } from "lucide-react";
+import { ArrowLeft, Play, Pause, Check, ShieldCheck, ShoppingCart, CheckCircle2 } from "lucide-react";
 import type { Beat } from "@/lib/types";
 import { formatNaira } from "@/lib/format";
 import { usePlayer } from "@/lib/player";
+import { submitOrder } from "@/lib/actions";
+import Honeypot from "@/components/Honeypot";
 import BeatCard from "@/components/BeatCard";
 
 const EXCLUSIVE_INCLUDES = [
@@ -103,19 +106,9 @@ export default function BeatDetailView({ beat, related }: { beat: Beat; related:
               ))}
             </ul>
 
-            <button
-              disabled
-              className="mt-5 w-full py-3 rounded-full bg-[#1DB954]/60 text-black font-semibold flex items-center justify-center gap-2 cursor-not-allowed"
-              title="Secure checkout is coming soon"
-            >
-              <Lock size={15} /> {beat.sold ? "Sold" : "Buy — checkout coming soon"}
-            </button>
-            {!beat.sold && (
-              <p className="text-center text-[11px] text-muted-foreground mt-2">
-                Want it now?{" "}
-                <Link href="/request" className="text-[#1DB954] hover:underline">Message the producer</Link>.
-              </p>
-            )}
+            <div className="mt-5">
+              <OrderPanel beat={beat} />
+            </div>
           </div>
 
           {/* Producer notes */}
@@ -139,6 +132,95 @@ export default function BeatDetailView({ beat, related }: { beat: Beat; related:
           </div>
         </section>
       )}
+    </div>
+  );
+}
+
+function OrderPanel({ beat }: { beat: Beat }) {
+  const [open, setOpen] = useState(false);
+  const [done, setDone] = useState(false);
+  const [form, setForm] = useState({ name: "", email: "", phone: "", note: "" });
+  const [hp, setHp] = useState("");
+  const mountedAt = useRef(Date.now());
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+
+  const up = (k: keyof typeof form, v: string) => setForm((s) => ({ ...s, [k]: v }));
+  const inputCls =
+    "w-full bg-[#282828] border border-border rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[#1DB954]/40";
+
+  const submit = () =>
+    start(async () => {
+      setError(null);
+      if (!form.email.trim() || !form.email.includes("@")) {
+        setError("Enter a valid email so we can send your beat.");
+        return;
+      }
+      const res = await submitOrder(
+        {
+          beatId: beat.id,
+          beatTitle: beat.title,
+          amount: beat.price,
+          name: form.name,
+          email: form.email,
+          phone: form.phone,
+          note: form.note,
+        },
+        { hp, elapsedMs: Date.now() - mountedAt.current }
+      );
+      if (res.ok) setDone(true);
+      else setError(res.error ?? "Something went wrong. Please try again.");
+    });
+
+  if (beat.sold) {
+    return (
+      <button disabled className="w-full py-3 rounded-full bg-[#282828] text-muted-foreground font-semibold cursor-not-allowed">
+        Sold — no longer available
+      </button>
+    );
+  }
+
+  if (done) {
+    return (
+      <div className="text-center py-2">
+        <CheckCircle2 size={32} className="text-[#1DB954] mx-auto mb-2" />
+        <p className="text-sm font-semibold text-white">Order received!</p>
+        <p className="text-xs text-muted-foreground mt-1">
+          Ibiga will confirm payment and email your files to <span className="text-white">{form.email}</span>.
+        </p>
+      </div>
+    );
+  }
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className="w-full py-3 rounded-full bg-[#1DB954] text-black font-semibold flex items-center justify-center gap-2 hover:bg-[#1ed760] transition-colors"
+      >
+        <ShoppingCart size={16} /> Buy — {formatNaira(beat.price)}
+      </button>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <Honeypot value={hp} onChange={setHp} />
+      <input className={inputCls} placeholder="Your name" value={form.name} onChange={(e) => up("name", e.target.value)} />
+      <input className={inputCls} placeholder="Email (where we send the beat)" type="email" value={form.email} onChange={(e) => up("email", e.target.value)} />
+      <input className={inputCls} placeholder="Phone (optional)" value={form.phone} onChange={(e) => up("phone", e.target.value)} />
+      <textarea className={`${inputCls} resize-none`} rows={2} placeholder="Anything you'd like the producer to know? (optional)" value={form.note} onChange={(e) => up("note", e.target.value)} />
+      {error && <p className="text-sm text-red-400">{error}</p>}
+      <button
+        onClick={submit}
+        disabled={pending}
+        className="w-full py-3 rounded-full bg-[#1DB954] text-black font-semibold hover:bg-[#1ed760] transition-colors disabled:opacity-60"
+      >
+        {pending ? "Placing order…" : `Place order — ${formatNaira(beat.price)}`}
+      </button>
+      <p className="text-center text-[11px] text-muted-foreground">
+        Payment is arranged with the producer. Secure card checkout is coming soon.
+      </p>
     </div>
   );
 }
